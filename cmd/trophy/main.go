@@ -54,6 +54,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  W/S/A/D/Q/E - Rotate model\n")
 		fmt.Fprintf(os.Stderr, "  Space       - Random spin\n")
 		fmt.Fprintf(os.Stderr, "  R           - Reset view\n")
+		fmt.Fprintf(os.Stderr, "  T           - Toggle texture\n")
+		fmt.Fprintf(os.Stderr, "  X           - Toggle wireframe\n")
+		fmt.Fprintf(os.Stderr, "  L           - Position light (mouse to aim, click to set)\n")
 		fmt.Fprintf(os.Stderr, "  Esc         - Quit\n")
 	}
 	flag.Parse()
