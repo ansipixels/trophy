@@ -576,12 +576,15 @@ func run(modelPath string) error {
 			dt = 0.1
 		}
 
-		// Apply input torque
+		// Apply input torque and decay it (key release events unreliable)
 		rotation.ApplyImpulse(
 			inputTorque.pitch*dt,
 			inputTorque.yaw*dt,
 			inputTorque.roll*dt,
 		)
+		inputTorque.pitch *= 0.9
+		inputTorque.yaw *= 0.9
+		inputTorque.roll *= 0.9
 
 		// Update springs (harmonica handles timing internally)
 		rotation.Update()
