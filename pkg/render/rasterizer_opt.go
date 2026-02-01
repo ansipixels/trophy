@@ -198,12 +198,14 @@ func (r *Rasterizer) DrawMeshGouraudOpt(mesh MeshRenderer, transform math3d.Mat4
 	}
 }
 
-// DrawTriangleTexturedOpt is an optimized textured triangle rasterizer.
+// DrawTriangleTexturedOpt is an optimized textured triangle rasterizer with Gouraud shading.
 func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDir math3d.Vec3) {
 	var sv [3]screenVertex
+	var vertexIntensity [3]float64
 	allBehind := true
 
 	viewProj := r.camera.ViewProjectionMatrix()
+	normLight := lightDir.Normalize()
 
 	for i := range 3 {
 		clipPos := viewProj.MulVec4(math3d.V4FromV3(tri.V[i].Position, 1))
@@ -222,8 +224,11 @@ func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDi
 
 		sv[i].X = (sv[i].X + 1) * 0.5 * float64(r.width)
 		sv[i].Y = (1 - sv[i].Y) * 0.5 * float64(r.height)
-		sv[i].Normal = tri.V[i].Normal
 		sv[i].UV = tri.V[i].UV
+
+		// Per-vertex lighting (Gouraud)
+		intensity := math.Max(0, tri.V[i].Normal.Dot(normLight))
+		vertexIntensity[i] = 0.3 + 0.7*intensity
 	}
 
 	if allBehind {
@@ -239,13 +244,6 @@ func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDi
 	if cross < 0 {
 		return
 	}
-
-	// Face normal for lighting
-	e1 := tri.V[1].Position.Sub(tri.V[0].Position)
-	e2 := tri.V[2].Position.Sub(tri.V[0].Position)
-	faceNormal := e1.Cross(e2).Normalize()
-	intensity := math.Max(0.2, faceNormal.Dot(lightDir.Normalize()))
-	intensity = 0.3 + 0.7*intensity
 
 	minX := int(math.Max(0, math.Floor(min3(sv[0].X, sv[1].X, sv[2].X))))
 	maxX := int(math.Min(float64(r.width-1), math.Ceil(max3(sv[0].X, sv[1].X, sv[2].X))))
@@ -302,7 +300,7 @@ func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDi
 
 				idx := rowOffset + x
 				if z < zbuffer[idx] {
-					// Perspective-correct UV
+					// Perspective-correct interpolation
 					pw0 := bc0 * invW[0]
 					pw1 := bc1 * invW[1]
 					pw2 := bc2 * invW[2]
@@ -311,6 +309,9 @@ func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDi
 						invOneOverW := 1.0 / oneOverW
 						u := (pw0*sv[0].UV.X + pw1*sv[1].UV.X + pw2*sv[2].UV.X) * invOneOverW
 						v := (pw0*sv[0].UV.Y + pw1*sv[1].UV.Y + pw2*sv[2].UV.Y) * invOneOverW
+
+						// Perspective-correct lighting intensity
+						intensity := (pw0*vertexIntensity[0] + pw1*vertexIntensity[1] + pw2*vertexIntensity[2]) * invOneOverW
 
 						texColor := tex.Sample(u, v)
 						litColor := MultiplyColor(texColor, intensity)
