@@ -6,7 +6,7 @@
 //   Scroll      - Zoom in/out
 //   W/S         - Pitch up/down
 //   A/D         - Yaw left/right
-//   Q/E         - Roll left/right
+//   Q/E         - Roll left/right (Q rolls left, E rolls right)
 //   Space       - Apply random impulse
 //   R           - Reset rotation
 //   T           - Toggle texture on/off
@@ -39,7 +39,7 @@ import (
 
 var (
 	texturePath = flag.String("texture", "", "Path to texture image (PNG/JPG)")
-	targetFPS   = flag.Int("fps", 30, "Target FPS")
+	targetFPS   = flag.Int("fps", 60, "Target FPS")
 	bgColor     = flag.String("bg", "30,30,40", "Background color (R,G,B)")
 )
 
@@ -52,7 +52,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "\nControls:\n")
 		fmt.Fprintf(os.Stderr, "  Mouse drag  - Rotate model\n")
 		fmt.Fprintf(os.Stderr, "  Scroll      - Zoom in/out\n")
-		fmt.Fprintf(os.Stderr, "  W/S/A/D/Q/E - Rotate model\n")
+		fmt.Fprintf(os.Stderr, "  W/S/A/D     - Pitch and yaw\n")
+		fmt.Fprintf(os.Stderr, "  Q/E         - Roll left/right\n")
 		fmt.Fprintf(os.Stderr, "  Space       - Random spin\n")
 		fmt.Fprintf(os.Stderr, "  R           - Reset view\n")
 		fmt.Fprintf(os.Stderr, "  T           - Toggle texture\n")
@@ -188,11 +189,33 @@ func (h *HUD) Render(width, height int, viewState *ViewState) {
 		fgGreen   = "\x1b[92m"
 		fgYellow  = "\x1b[93m"
 		fgCyan    = "\x1b[96m"
+		clearLine = "\x1b[2K"
 	)
 
 	// Helper to position cursor
 	moveTo := func(row, col int) string {
 		return fmt.Sprintf("\x1b[%d;%dH", row, col)
+	}
+
+	// Always clear the HUD rows (so toggling off works)
+	fmt.Print(moveTo(1, 1) + clearLine)
+	fmt.Print(moveTo(height, 1) + clearLine)
+
+	// Light mode always shows its indicator
+	if viewState.LightMode {
+		lightMsg := fmt.Sprintf("%s%s%s ◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel %s", 
+			bgBlack, bold, fgYellow, reset)
+		lightCol := (width - 60) / 2
+		if lightCol < 1 {
+			lightCol = 1
+		}
+		fmt.Print(moveTo(height, lightCol) + lightMsg)
+		return
+	}
+
+	// If HUD is disabled, we're done (lines already cleared)
+	if !viewState.ShowHUD {
+		return
 	}
 
 	// Top left: FPS
@@ -225,29 +248,18 @@ func (h *HUD) Render(width, height int, viewState *ViewState) {
 		checkWire = "[✓]"
 	}
 
-	// Light mode indicator (bottom row, or normal mode hints)
-	if viewState.LightMode {
-		lightMsg := fmt.Sprintf("%s%s%s ◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel %s", 
-			bgBlack, bold, fgYellow, reset)
-		lightCol := (width - 60) / 2
-		if lightCol < 1 {
-			lightCol = 1
-		}
-		fmt.Print(moveTo(height, lightCol) + lightMsg)
-	} else {
-		// Mode checkboxes
-		modeStr := fmt.Sprintf("%s%s %s Texture  %s X-Ray (wireframe) %s", 
-			bgBlack, fgWhite, checkTex, checkWire, reset)
-		fmt.Print(moveTo(height, 1) + modeStr)
+	// Bottom: Mode checkboxes and hint
+	modeStr := fmt.Sprintf("%s%s %s Texture  %s X-Ray (wireframe) %s", 
+		bgBlack, fgWhite, checkTex, checkWire, reset)
+	fmt.Print(moveTo(height, 1) + modeStr)
 
-		// Light hint (right side of bottom)
-		hint := fmt.Sprintf("%s%s%s L: position light %s", bgBlack, dim, fgYellow, reset)
-		hintCol := width - 18
-		if hintCol < 1 {
-			hintCol = 1
-		}
-		fmt.Print(moveTo(height, hintCol) + hint)
+	// Light hint (right side of bottom)
+	hint := fmt.Sprintf("%s%s%s L: position light %s", bgBlack, dim, fgYellow, reset)
+	hintCol := width - 18
+	if hintCol < 1 {
+		hintCol = 1
 	}
+	fmt.Print(moveTo(height, hintCol) + hint)
 }
 
 // ScreenToLightDir converts a screen position to a light direction.
@@ -416,9 +428,11 @@ func run(modelPath string) error {
 						cancel()
 						return
 					}
-				case ev.MatchString("q", "ctrl+c"):
+				case ev.MatchString("ctrl+c"):
 					cancel()
 					return
+				case ev.MatchString("q"):
+					inputTorque.roll = -torqueStrength
 				case ev.MatchString("r"):
 					rotation.Reset()
 					cameraZ = 5.0
@@ -433,8 +447,6 @@ func run(modelPath string) error {
 					inputTorque.yaw = torqueStrength
 				case ev.MatchString("e"):
 					inputTorque.roll = torqueStrength
-				case ev.MatchString("shift+q"):
-					inputTorque.roll = -torqueStrength
 				case ev.MatchString("space"):
 					rotation.Pitch.ApplyImpulse((rand.Float64() - 0.5) * 20)
 					rotation.Yaw.ApplyImpulse((rand.Float64() - 0.5) * 20)
@@ -459,7 +471,7 @@ func run(modelPath string) error {
 					// Enter light positioning mode
 					viewState.LightMode = true
 					viewState.PendingLight = viewState.LightDir
-				case ev.MatchString("?", "shift+/"):
+				case ev.MatchString("?"), ev.MatchString("shift+/"):
 					// Toggle HUD
 					viewState.ShowHUD = !viewState.ShowHUD
 				}
@@ -470,7 +482,7 @@ func run(modelPath string) error {
 					inputTorque.pitch = 0
 				case ev.MatchString("a", "left", "d", "right"):
 					inputTorque.yaw = 0
-				case ev.MatchString("e", "shift+q"):
+				case ev.MatchString("q", "e"):
 					inputTorque.roll = 0
 				}
 
@@ -593,11 +605,9 @@ func run(modelPath string) error {
 			return fmt.Errorf("flush: %w", err)
 		}
 
-		// HUD overlay
+		// HUD overlay (always update FPS, render clears lines when HUD off)
 		hud.UpdateFPS()
-		if viewState.ShowHUD || viewState.LightMode {
-			hud.Render(width, height, viewState)
-		}
+		hud.Render(width, height, viewState)
 
 		// Frame timing
 		elapsed := time.Since(now)
