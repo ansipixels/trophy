@@ -225,27 +225,28 @@ func (h *HUD) Render(width, height int, viewState *ViewState) {
 		checkWire = "[✓]"
 	}
 
-	modeStr := fmt.Sprintf("%s%s%s %s Texture  %s X-Ray %s", 
-		bgBlack, fgWhite, checkTex, checkWire, reset, reset)
-	fmt.Print(moveTo(height, 1) + modeStr)
-
-	// Light hint (right side of bottom)
-	hint := fmt.Sprintf("%s%s%s L: position light %s", bgBlack, dim, fgYellow, reset)
-	hintCol := width - 18
-	if hintCol < 1 {
-		hintCol = 1
-	}
-	fmt.Print(moveTo(height, hintCol) + hint)
-
-	// Light mode indicator
+	// Light mode indicator (bottom row, or normal mode hints)
 	if viewState.LightMode {
-		lightMsg := fmt.Sprintf("%s%s%s ◉ LIGHT MODE - Click to set, Esc to cancel %s", 
+		lightMsg := fmt.Sprintf("%s%s%s ◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel %s", 
 			bgBlack, bold, fgYellow, reset)
-		lightCol := (width - 42) / 2
+		lightCol := (width - 60) / 2
 		if lightCol < 1 {
 			lightCol = 1
 		}
-		fmt.Print(moveTo(height/2, lightCol) + lightMsg)
+		fmt.Print(moveTo(height, lightCol) + lightMsg)
+	} else {
+		// Mode checkboxes
+		modeStr := fmt.Sprintf("%s%s %s Texture  %s X-Ray (wireframe) %s", 
+			bgBlack, fgWhite, checkTex, checkWire, reset)
+		fmt.Print(moveTo(height, 1) + modeStr)
+
+		// Light hint (right side of bottom)
+		hint := fmt.Sprintf("%s%s%s L: position light %s", bgBlack, dim, fgYellow, reset)
+		hintCol := width - 18
+		if hintCol < 1 {
+			hintCol = 1
+		}
+		fmt.Print(moveTo(height, hintCol) + hint)
 	}
 }
 
