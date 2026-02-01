@@ -30,17 +30,17 @@ trophy -fps 60 model.glb      # Higher framerate
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
-| Mouse drag | Rotate model |
-| Scroll wheel | Zoom in/out |
-| W/S | Pitch up/down |
-| A/D | Yaw left/right |
-| Q/E | Roll |
-| Space | Random spin |
-| +/- | Zoom |
-| R | Reset view |
-| Esc | Quit |
+| Input        | Action         |
+| ------------ | -------------- |
+| Mouse drag   | Rotate model   |
+| Scroll wheel | Zoom in/out    |
+| W/S          | Pitch up/down  |
+| A/D          | Yaw left/right |
+| Q/E          | Roll           |
+| Space        | Random spin    |
+| +/-          | Zoom           |
+| R            | Reset view     |
+| Esc          | Quit           |
 
 ## Library Usage
 
@@ -70,10 +70,6 @@ rasterizer.DrawMeshTexturedGouraud(mesh, transform, texture, lightDir)
 - `pkg/math3d` - 3D math (Vec2, Vec3, Vec4, Mat4)
 - `pkg/models` - Model loaders (OBJ, GLB/GLTF)
 - `pkg/render` - Software rasterizer, camera, textures
-
-## License
-
-MIT
 
 ## Credits
 
