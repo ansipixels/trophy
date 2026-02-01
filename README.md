@@ -46,6 +46,12 @@ trophy -fps 60 model.glb      # Higher framerate
 | ?            | Toggle HUD overlay |
 | Esc          | Quit               |
 
+## Lighting
+
+Press `L` to enter lighting mode and drag to reposition the light source in real-time:
+
+![Lighting Demo](docs/lighting-demo.gif)
+
 ## Library Usage
 
 Trophy's rendering packages can be used as a library:
