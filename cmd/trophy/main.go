@@ -23,7 +23,6 @@ import (
 	"fmt"
 	"image"
 	"math"
-	"math/rand"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -98,12 +97,14 @@ func NewRotationAxis(fps int) RotationAxis {
 }
 
 // Update applies velocity to position and decays velocity toward 0 using spring
-func (a *RotationAxis) Update() {
+func (a *RotationAxis) Update(damping bool) {
 	// Apply velocity to position
 	a.Position += a.Velocity
 
 	// Use spring to animate velocity toward 0 (smooth deceleration)
-	a.Velocity, a.velAccel = a.velSpring.Update(a.Velocity, a.velAccel, 0)
+	if damping {
+		a.Velocity, a.velAccel = a.velSpring.Update(a.Velocity, a.velAccel, 0)
+	}
 }
 
 // RotationState holds rotation with harmonica spring physics
@@ -121,10 +122,10 @@ func NewRotationState(fps int) *RotationState {
 	}
 }
 
-func (r *RotationState) Update() {
-	r.Pitch.Update()
-	r.Yaw.Update()
-	r.Roll.Update()
+func (r *RotationState) Update(damping bool) {
+	r.Pitch.Update(damping)
+	r.Yaw.Update(damping)
+	r.Roll.Update(damping)
 }
 
 func (r *RotationState) ApplyImpulse(pitch, yaw, roll float64) {
@@ -156,6 +157,7 @@ type ViewState struct {
 	LightDir       math3d.Vec3 // Current light direction
 	PendingLight   math3d.Vec3 // Light direction while positioning
 	ShowHUD        bool        // Whether to show the HUD overlay
+	SpinMode       bool        // Whether auto-spin is enabled
 }
 
 // NewViewState creates default view state
@@ -456,11 +458,12 @@ func run(modelPath string) error {
 				case ev.MatchString("e"):
 					inputTorque.roll = torqueStrength
 				case ev.MatchString("space"):
-					rotation.ApplyImpulse(
-						(rand.Float64()-0.5)*1.5,
-						(rand.Float64()-0.5)*1.5,
-						(rand.Float64()-0.5)*1.5,
-					)
+					// Toggle spin mode
+					viewState.SpinMode = !viewState.SpinMode
+					if viewState.SpinMode {
+						// Set a gentle constant spin
+						rotation.Yaw.Velocity = 0.02
+					}
 				case ev.MatchString("+", "="):
 					cameraZ = math.Max(1, cameraZ-0.5)
 					camera.SetPosition(math3d.V3(0, 0, cameraZ))
@@ -579,7 +582,7 @@ func run(modelPath string) error {
 		inputTorque.roll *= 0.9
 
 		// Update springs (harmonica handles timing internally)
-		rotation.Update()
+		rotation.Update(!viewState.SpinMode)
 
 		// Build transform
 		transform := math3d.RotateX(rotation.Pitch.Position).
