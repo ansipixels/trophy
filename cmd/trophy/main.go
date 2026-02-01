@@ -1,0 +1,374 @@
+// trophy - Terminal 3D Model Viewer
+// View OBJ and GLB files in your terminal with full 3D rendering.
+//
+// Controls:
+//   Mouse drag  - Rotate model (yaw/pitch)
+//   Scroll      - Zoom in/out
+//   W/S         - Pitch up/down
+//   A/D         - Yaw left/right
+//   Q/E         - Roll left/right
+//   Space       - Apply random impulse
+//   R           - Reset rotation
+//   +/-         - Adjust zoom
+//   Esc/Q       - Quit
+package main
+
+import (
+	"context"
+	"flag"
+	"fmt"
+	"image"
+	"math"
+	"math/rand"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"strings"
+	"syscall"
+	"time"
+
+	uv "github.com/charmbracelet/ultraviolet"
+	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/taigrr/trophy/pkg/models"
+	"github.com/taigrr/trophy/pkg/render"
+)
+
+var (
+	texturePath = flag.String("texture", "", "Path to texture image (PNG/JPG)")
+	targetFPS   = flag.Int("fps", 30, "Target FPS")
+	bgColor     = flag.String("bg", "30,30,40", "Background color (R,G,B)")
+)
+
+func main() {
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "trophy - Terminal 3D Model Viewer\n\n")
+		fmt.Fprintf(os.Stderr, "Usage: trophy [options] <model.obj|model.glb>\n\n")
+		fmt.Fprintf(os.Stderr, "Options:\n")
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nControls:\n")
+		fmt.Fprintf(os.Stderr, "  Mouse drag  - Rotate model\n")
+		fmt.Fprintf(os.Stderr, "  Scroll      - Zoom in/out\n")
+		fmt.Fprintf(os.Stderr, "  W/S/A/D/Q/E - Rotate model\n")
+		fmt.Fprintf(os.Stderr, "  Space       - Random spin\n")
+		fmt.Fprintf(os.Stderr, "  R           - Reset view\n")
+		fmt.Fprintf(os.Stderr, "  Esc         - Quit\n")
+	}
+	flag.Parse()
+
+	if flag.NArg() < 1 {
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	modelPath := flag.Arg(0)
+
+	if err := run(modelPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+// Spring represents a damped harmonic oscillator for smooth rotation
+type Spring struct {
+	Position float64
+	Velocity float64
+	Damping  float64
+}
+
+func (s *Spring) Update(dt float64) {
+	dampingForce := -s.Damping * s.Velocity
+	s.Velocity += dampingForce * dt
+	s.Position += s.Velocity * dt
+}
+
+func (s *Spring) ApplyImpulse(impulse float64) {
+	s.Velocity += impulse
+}
+
+// RotationState holds rotation with spring physics
+type RotationState struct {
+	Pitch, Yaw, Roll Spring
+}
+
+func NewRotationState() *RotationState {
+	return &RotationState{
+		Pitch: Spring{Damping: 2.0},
+		Yaw:   Spring{Damping: 2.0},
+		Roll:  Spring{Damping: 2.0},
+	}
+}
+
+func (r *RotationState) Update(dt float64) {
+	r.Pitch.Update(dt)
+	r.Yaw.Update(dt)
+	r.Roll.Update(dt)
+}
+
+func (r *RotationState) Reset() {
+	r.Pitch = Spring{Damping: 2.0}
+	r.Yaw = Spring{Damping: 2.0}
+	r.Roll = Spring{Damping: 2.0}
+}
+
+func run(modelPath string) error {
+	// Parse background color
+	var bgR, bgG, bgB uint8 = 30, 30, 40
+	fmt.Sscanf(*bgColor, "%d,%d,%d", &bgR, &bgG, &bgB)
+
+	// Create terminal
+	term := uv.DefaultTerminal()
+
+	width, height, err := term.GetSize()
+	if err != nil {
+		return fmt.Errorf("get terminal size: %w", err)
+	}
+
+	if err := term.Start(); err != nil {
+		return fmt.Errorf("start terminal: %w", err)
+	}
+
+	term.EnterAltScreen()
+	term.HideCursor()
+	term.Resize(width, height)
+
+	// Enable mouse mode
+	fmt.Fprint(os.Stdout, "\x1b[?1003h") // Enable any-event mouse tracking
+	fmt.Fprint(os.Stdout, "\x1b[?1006h") // Enable SGR extended mouse mode
+
+	// Create renderer
+	termRenderer := render.NewTerminalRenderer(term, width, height)
+	fbWidth, fbHeight := termRenderer.FramebufferSize()
+	fb := render.NewFramebuffer(fbWidth, fbHeight)
+
+	// Create camera
+	camera := render.NewCamera()
+	camera.SetAspectRatio(float64(fbWidth) / float64(fbHeight))
+	camera.SetFOV(math.Pi / 3)
+	camera.SetClipPlanes(0.1, 100)
+	camera.SetPosition(math3d.V3(0, 0, 5))
+	camera.LookAt(math3d.V3(0, 0, 0))
+
+	rasterizer := render.NewRasterizer(camera, fb)
+
+	// Load texture if specified
+	var texture *render.Texture
+	if *texturePath != "" {
+		texture, err = render.LoadTexture(*texturePath)
+		if err != nil {
+			fmt.Printf("Warning: could not load texture: %v\n", err)
+		}
+	}
+
+	// Load model
+	ext := strings.ToLower(filepath.Ext(modelPath))
+	var mesh *models.Mesh
+
+	switch ext {
+	case ".glb", ".gltf":
+		var embeddedImg image.Image
+		mesh, embeddedImg, err = models.LoadGLBWithTexture(modelPath)
+		if err != nil {
+			return fmt.Errorf("load model: %w", err)
+		}
+		// Use embedded texture if no explicit texture and one exists
+		if texture == nil && embeddedImg != nil {
+			texture = render.TextureFromImage(embeddedImg)
+			fmt.Printf("Using embedded texture: %dx%d\n", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
+		}
+	case ".obj":
+		mesh, err = models.LoadOBJ(modelPath)
+		if err != nil {
+			return fmt.Errorf("load model: %w", err)
+		}
+	default:
+		return fmt.Errorf("unsupported format: %s (use .obj or .glb)", ext)
+	}
+
+	// Generate fallback texture if none
+	if texture == nil {
+		texture = render.NewCheckerTexture(64, 64, 8, render.RGB(200, 200, 200), render.RGB(100, 100, 100))
+	}
+
+	fmt.Printf("Loaded: %s (%d vertices, %d triangles)\n", filepath.Base(modelPath), mesh.VertexCount(), mesh.TriangleCount())
+
+	// Center and scale model
+	mesh.CalculateBounds()
+	center := mesh.Center()
+	size := mesh.Size()
+	maxDim := math.Max(size.X, math.Max(size.Y, size.Z))
+	if maxDim > 0 {
+		scale := 2.0 / maxDim
+		transform := math3d.Scale(math3d.V3(scale, scale, scale)).Mul(math3d.Translate(center.Scale(-1)))
+		mesh.Transform(transform)
+	}
+
+	// Initialize rotation
+	rotation := NewRotationState()
+	lightDir := math3d.V3(0.5, 1, 0.3).Normalize()
+
+	// Context for clean shutdown
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigChan
+		cancel()
+	}()
+
+	// Input state
+	inputTorque := struct{ pitch, yaw, roll float64 }{}
+	const torqueStrength = 15.0
+
+	// Mouse state
+	var mouseDown bool
+	var lastMouseX, lastMouseY int
+	cameraZ := 5.0
+
+	// Event handler
+	go func() {
+		for ev := range term.Events() {
+			switch ev := ev.(type) {
+			case uv.WindowSizeEvent:
+				width, height = ev.Width, ev.Height
+				term.Erase()
+				term.Resize(width, height)
+				termRenderer = render.NewTerminalRenderer(term, width, height)
+				fbWidth, fbHeight = termRenderer.FramebufferSize()
+				fb = render.NewFramebuffer(fbWidth, fbHeight)
+				rasterizer = render.NewRasterizer(camera, fb)
+				camera.SetAspectRatio(float64(fbWidth) / float64(fbHeight))
+
+			case uv.KeyPressEvent:
+				switch {
+				case ev.MatchString("q", "ctrl+c", "escape"):
+					cancel()
+					return
+				case ev.MatchString("r"):
+					rotation.Reset()
+					cameraZ = 5.0
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+				case ev.MatchString("w", "up"):
+					inputTorque.pitch = -torqueStrength
+				case ev.MatchString("s", "down"):
+					inputTorque.pitch = torqueStrength
+				case ev.MatchString("a", "left"):
+					inputTorque.yaw = -torqueStrength
+				case ev.MatchString("d", "right"):
+					inputTorque.yaw = torqueStrength
+				case ev.MatchString("e"):
+					inputTorque.roll = torqueStrength
+				case ev.MatchString("shift+q"):
+					inputTorque.roll = -torqueStrength
+				case ev.MatchString("space"):
+					rotation.Pitch.ApplyImpulse((rand.Float64() - 0.5) * 20)
+					rotation.Yaw.ApplyImpulse((rand.Float64() - 0.5) * 20)
+					rotation.Roll.ApplyImpulse((rand.Float64() - 0.5) * 20)
+				case ev.MatchString("+", "="):
+					cameraZ = math.Max(1, cameraZ-0.5)
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+				case ev.MatchString("-", "_"):
+					cameraZ = math.Min(20, cameraZ+0.5)
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+				}
+
+			case uv.KeyReleaseEvent:
+				switch {
+				case ev.MatchString("w", "up", "s", "down"):
+					inputTorque.pitch = 0
+				case ev.MatchString("a", "left", "d", "right"):
+					inputTorque.yaw = 0
+				case ev.MatchString("e", "shift+q"):
+					inputTorque.roll = 0
+				}
+
+			case uv.MouseClickEvent:
+				mouseDown = true
+				lastMouseX, lastMouseY = ev.X, ev.Y
+
+			case uv.MouseReleaseEvent:
+				mouseDown = false
+
+			case uv.MouseMotionEvent:
+				if mouseDown {
+					dx := ev.X - lastMouseX
+					dy := ev.Y - lastMouseY
+					rotation.Yaw.ApplyImpulse(float64(dx) * 0.5)
+					rotation.Pitch.ApplyImpulse(float64(dy) * 0.5)
+					lastMouseX, lastMouseY = ev.X, ev.Y
+				}
+
+			case uv.MouseWheelEvent:
+				if ev.Button == uv.MouseWheelUp {
+					cameraZ -= 0.5
+					if cameraZ < 1 {
+						cameraZ = 1
+					}
+				} else if ev.Button == uv.MouseWheelDown {
+					cameraZ += 0.5
+					if cameraZ > 20 {
+						cameraZ = 20
+					}
+				}
+				camera.SetPosition(math3d.V3(0, 0, cameraZ))
+			}
+		}
+	}()
+
+	// Main loop
+	targetDuration := time.Second / time.Duration(*targetFPS)
+	lastFrame := time.Now()
+
+	cleanup := func() {
+		fmt.Fprint(os.Stdout, "\x1b[?1003l")
+		fmt.Fprint(os.Stdout, "\x1b[?1006l")
+		term.ExitAltScreen()
+		term.ShowCursor()
+		term.Shutdown(context.Background())
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			cleanup()
+			return nil
+		default:
+		}
+
+		now := time.Now()
+		dt := now.Sub(lastFrame).Seconds()
+		lastFrame = now
+
+		if dt > 0.1 {
+			dt = 0.1
+		}
+
+		// Apply input torque
+		rotation.Pitch.ApplyImpulse(inputTorque.pitch * dt)
+		rotation.Yaw.ApplyImpulse(inputTorque.yaw * dt)
+		rotation.Roll.ApplyImpulse(inputTorque.roll * dt)
+
+		// Update springs
+		rotation.Update(dt)
+
+		// Build transform
+		transform := math3d.RotateX(rotation.Pitch.Position).
+			Mul(math3d.RotateY(rotation.Yaw.Position)).
+			Mul(math3d.RotateZ(rotation.Roll.Position))
+
+		// Render
+		fb.Clear(render.RGB(bgR, bgG, bgB))
+		rasterizer.ClearDepth()
+		rasterizer.DrawMeshTexturedGouraud(mesh, transform, texture, lightDir)
+
+		// Display
+		termRenderer.Render(fb)
+
+		// Frame timing
+		elapsed := time.Since(now)
+		if elapsed < targetDuration {
+			time.Sleep(targetDuration - elapsed)
+		}
+	}
+}
