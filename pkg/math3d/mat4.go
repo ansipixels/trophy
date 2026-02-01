@@ -267,3 +267,42 @@ func (m *Mat4) SetTranslation(v Vec3) {
 	m[13] = v.Y
 	m[14] = v.Z
 }
+
+// Mat4FromSlice creates a Mat4 from a slice of 16 floats (column-major order).
+func Mat4FromSlice(s []float64) Mat4 {
+	var m Mat4
+	for i := 0; i < 16 && i < len(s); i++ {
+		m[i] = s[i]
+	}
+	return m
+}
+
+// QuatToMat4 converts a quaternion (x, y, z, w) to a rotation matrix.
+// The quaternion is expected in GLTF format: (x, y, z, w) where w is the scalar.
+func QuatToMat4(x, y, z, w float64) Mat4 {
+	// Normalize the quaternion
+	n := math.Sqrt(x*x + y*y + z*z + w*w)
+	if n > 0 {
+		x /= n
+		y /= n
+		z /= n
+		w /= n
+	}
+
+	xx := x * x
+	yy := y * y
+	zz := z * z
+	xy := x * y
+	xz := x * z
+	yz := y * z
+	wx := w * x
+	wy := w * y
+	wz := w * z
+
+	return Mat4{
+		1 - 2*(yy+zz), 2 * (xy + wz), 2 * (xz - wy), 0,
+		2 * (xy - wz), 1 - 2*(xx+zz), 2 * (yz + wx), 0,
+		2 * (xz + wy), 2 * (yz - wx), 1 - 2*(xx+yy), 0,
+		0, 0, 0, 1,
+	}
+}

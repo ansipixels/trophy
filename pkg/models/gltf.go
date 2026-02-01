@@ -47,10 +47,36 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 	// Extract materials first
 	mesh.Materials = extractMaterials(doc, path)
 
-	// Process all meshes in the document
-	for _, m := range doc.Meshes {
-		if err := l.processMesh(doc, m, mesh); err != nil {
-			return nil, fmt.Errorf("process mesh %q: %w", m.Name, err)
+	// Process scene nodes with transforms (handles node hierarchy)
+	processedMeshes := make(map[int]bool)
+
+	if len(doc.Scenes) > 0 {
+		sceneIdx := 0
+		if doc.Scene != nil {
+			sceneIdx = int(*doc.Scene)
+		}
+		scene := doc.Scenes[sceneIdx]
+		for _, nodeIdx := range scene.Nodes {
+			l.processNode(doc, int(nodeIdx), math3d.Identity(), mesh, processedMeshes)
+		}
+	} else {
+		// No scenes defined, process all root nodes
+		for i := range doc.Nodes {
+			isRoot := true
+			for _, n := range doc.Nodes {
+				for _, child := range n.Children {
+					if int(child) == i {
+						isRoot = false
+						break
+					}
+				}
+				if !isRoot {
+					break
+				}
+			}
+			if isRoot {
+				l.processNode(doc, i, math3d.Identity(), mesh, processedMeshes)
+			}
 		}
 	}
 
@@ -74,6 +100,145 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 	mesh.CalculateBounds()
 
 	return mesh, nil
+}
+
+// processNode recursively processes a node and its children, accumulating transforms.
+func (l *GLTFLoader) processNode(doc *gltf.Document, nodeIdx int, parentTransform math3d.Mat4, mesh *Mesh, processedMeshes map[int]bool) {
+	node := doc.Nodes[nodeIdx]
+
+	// Build this node's local transform
+	localTransform := math3d.Identity()
+
+	if node.Translation != [3]float64{0, 0, 0} {
+		localTransform = localTransform.Mul(math3d.Translate(math3d.V3(
+			node.Translation[0],
+			node.Translation[1],
+			node.Translation[2],
+		)))
+	}
+
+	if node.Rotation != [4]float64{0, 0, 0, 1} {
+		localTransform = localTransform.Mul(math3d.QuatToMat4(
+			node.Rotation[0],
+			node.Rotation[1],
+			node.Rotation[2],
+			node.Rotation[3],
+		))
+	}
+
+	if node.Scale != [3]float64{1, 1, 1} && node.Scale != [3]float64{0, 0, 0} {
+		localTransform = localTransform.Mul(math3d.Scale(math3d.V3(
+			node.Scale[0],
+			node.Scale[1],
+			node.Scale[2],
+		)))
+	}
+
+	if node.Matrix != [16]float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1} {
+		localTransform = math3d.Mat4FromSlice(node.Matrix[:])
+	}
+
+	worldTransform := parentTransform.Mul(localTransform)
+
+	if node.Mesh != nil {
+		meshIdx := int(*node.Mesh)
+		gltfMesh := doc.Meshes[meshIdx]
+		l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform)
+		processedMeshes[meshIdx] = true
+	}
+
+	for _, childIdx := range node.Children {
+		l.processNode(doc, int(childIdx), worldTransform, mesh, processedMeshes)
+	}
+}
+
+// processMeshWithTransform extracts geometry from a GLTF mesh, applying the given transform.
+func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, mesh *Mesh, transform math3d.Mat4) error {
+	for _, prim := range m.Primitives {
+		if prim.Mode != gltf.PrimitiveTriangles && prim.Mode != 0 {
+			continue
+		}
+
+		posIdx, ok := prim.Attributes[gltf.POSITION]
+		if !ok {
+			continue
+		}
+
+		positions, err := readVec3Accessor(doc, posIdx)
+		if err != nil {
+			return fmt.Errorf("read positions: %w", err)
+		}
+
+		var normals []math3d.Vec3
+		if normIdx, ok := prim.Attributes[gltf.NORMAL]; ok {
+			normals, err = readVec3Accessor(doc, normIdx)
+			if err != nil {
+				return fmt.Errorf("read normals: %w", err)
+			}
+		}
+
+		var uvs []math3d.Vec2
+		if uvIdx, ok := prim.Attributes[gltf.TEXCOORD_0]; ok {
+			uvs, err = readVec2Accessor(doc, uvIdx)
+			if err != nil {
+				return fmt.Errorf("read uvs: %w", err)
+			}
+		}
+
+		materialIdx := -1
+		if prim.Material != nil {
+			materialIdx = int(*prim.Material)
+		}
+
+		baseVertex := len(mesh.Vertices)
+
+		for i := range positions {
+			worldPos := transform.MulVec3(positions[i])
+
+			v := MeshVertex{
+				Position: worldPos,
+			}
+
+			if i < len(normals) {
+				v.Normal = transform.MulVec3Dir(normals[i]).Normalize()
+			}
+			if i < len(uvs) {
+				v.UV = math3d.V2(uvs[i].X, 1.0-uvs[i].Y)
+			}
+			mesh.Vertices = append(mesh.Vertices, v)
+		}
+
+		if prim.Indices != nil {
+			indices, err := readIndices(doc, *prim.Indices)
+			if err != nil {
+				return fmt.Errorf("read indices: %w", err)
+			}
+
+			for i := 0; i+2 < len(indices); i += 3 {
+				mesh.Faces = append(mesh.Faces, Face{
+					V: [3]int{
+						baseVertex + indices[i],
+						baseVertex + indices[i+2],
+						baseVertex + indices[i+1],
+					},
+					Material: materialIdx,
+				})
+			}
+		} else {
+			for i := 0; i+2 < len(positions); i += 3 {
+				mesh.Faces = append(mesh.Faces, Face{
+					V: [3]int{
+						baseVertex + i,
+						baseVertex + i + 2,
+						baseVertex + i + 1,
+					},
+					Material: materialIdx,
+				})
+			}
+		}
+	}
+
+	return nil
 }
 
 // processMesh extracts geometry from a GLTF mesh.
