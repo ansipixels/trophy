@@ -9,8 +9,11 @@
 //   Q/E         - Roll left/right
 //   Space       - Apply random impulse
 //   R           - Reset rotation
+//   T           - Toggle texture on/off
+//   X           - Toggle wireframe mode (x-ray)
+//   L           - Light positioning mode (move mouse, click to set, Esc to cancel)
 //   +/-         - Adjust zoom
-//   Esc/Q       - Quit
+//   Esc         - Quit (or cancel light mode)
 package main
 
 import (
@@ -110,6 +113,57 @@ func (r *RotationState) Reset() {
 	r.Roll = Spring{Damping: 2.0}
 }
 
+// RenderMode controls how the mesh is drawn
+type RenderMode int
+
+const (
+	RenderModeTextured  RenderMode = iota // Textured with Gouraud shading
+	RenderModeFlat                        // Flat shading (no texture)
+	RenderModeWireframe                   // Wireframe only
+)
+
+// ViewState holds all view-related settings (UI state, not library code)
+type ViewState struct {
+	TextureEnabled bool        // Whether to show textures
+	RenderMode     RenderMode  // Current render mode
+	LightMode      bool        // Whether in light positioning mode
+	LightDir       math3d.Vec3 // Current light direction
+	PendingLight   math3d.Vec3 // Light direction while positioning
+}
+
+// NewViewState creates default view state
+func NewViewState() *ViewState {
+	return &ViewState{
+		TextureEnabled: true,
+		RenderMode:     RenderModeTextured,
+		LightMode:      false,
+		LightDir:       math3d.V3(0.5, 1, 0.3).Normalize(),
+	}
+}
+
+// ScreenToLightDir converts a screen position to a light direction.
+// Maps screen coords to a hemisphere above the object.
+func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d.Vec3 {
+	// Normalize to [-1, 1]
+	nx := (float64(screenX)/float64(width))*2 - 1
+	ny := (float64(screenY)/float64(height))*2 - 1
+
+	// Clamp to unit circle
+	lenSq := nx*nx + ny*ny
+	if lenSq > 1 {
+		len := math.Sqrt(lenSq)
+		nx /= len
+		ny /= len
+		lenSq = 1
+	}
+
+	// Z component (hemisphere projection)
+	nz := math.Sqrt(1 - lenSq)
+
+	// Return as light direction (pointing toward the object)
+	return math3d.V3(nx, -ny, nz).Normalize()
+}
+
 func run(modelPath string) error {
 	// Parse background color
 	var bgR, bgG, bgB uint8 = 30, 30, 40
@@ -202,9 +256,9 @@ func run(modelPath string) error {
 		mesh.Transform(transform)
 	}
 
-	// Initialize rotation
+	// Initialize rotation and view state
 	rotation := NewRotationState()
-	lightDir := math3d.V3(0.5, 1, 0.3).Normalize()
+	viewState := NewViewState()
 
 	// Context for clean shutdown
 	ctx, cancel := context.WithCancel(context.Background())
@@ -242,7 +296,15 @@ func run(modelPath string) error {
 
 			case uv.KeyPressEvent:
 				switch {
-				case ev.MatchString("q", "ctrl+c", "escape"):
+				case ev.MatchString("escape"):
+					if viewState.LightMode {
+						// Cancel light positioning mode
+						viewState.LightMode = false
+					} else {
+						cancel()
+						return
+					}
+				case ev.MatchString("q", "ctrl+c"):
 					cancel()
 					return
 				case ev.MatchString("r"):
@@ -271,6 +333,20 @@ func run(modelPath string) error {
 				case ev.MatchString("-", "_"):
 					cameraZ = math.Min(20, cameraZ+0.5)
 					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+				case ev.MatchString("t"):
+					// Toggle texture
+					viewState.TextureEnabled = !viewState.TextureEnabled
+				case ev.MatchString("x"):
+					// Toggle wireframe mode
+					if viewState.RenderMode == RenderModeWireframe {
+						viewState.RenderMode = RenderModeTextured
+					} else {
+						viewState.RenderMode = RenderModeWireframe
+					}
+				case ev.MatchString("l"):
+					// Enter light positioning mode
+					viewState.LightMode = true
+					viewState.PendingLight = viewState.LightDir
 				}
 
 			case uv.KeyReleaseEvent:
@@ -284,14 +360,25 @@ func run(modelPath string) error {
 				}
 
 			case uv.MouseClickEvent:
-				mouseDown = true
-				lastMouseX, lastMouseY = ev.X, ev.Y
+				if viewState.LightMode {
+					// Set light position and exit light mode
+					viewState.LightDir = viewState.PendingLight
+					viewState.LightMode = false
+				} else {
+					mouseDown = true
+					lastMouseX, lastMouseY = ev.X, ev.Y
+				}
 
 			case uv.MouseReleaseEvent:
-				mouseDown = false
+				if !viewState.LightMode {
+					mouseDown = false
+				}
 
 			case uv.MouseMotionEvent:
-				if mouseDown {
+				if viewState.LightMode {
+					// Update pending light direction based on mouse position
+					viewState.PendingLight = viewState.ScreenToLightDir(ev.X, ev.Y, width, height)
+				} else if mouseDown {
 					dx := ev.X - lastMouseX
 					dy := ev.Y - lastMouseY
 					rotation.Yaw.ApplyImpulse(float64(dx) * 0.5)
@@ -360,7 +447,29 @@ func run(modelPath string) error {
 		// Render
 		fb.Clear(render.RGB(bgR, bgG, bgB))
 		rasterizer.ClearDepth()
-		rasterizer.DrawMeshTexturedGouraud(mesh, transform, texture, lightDir)
+
+		// Choose light direction (pending if in light mode, otherwise current)
+		lightDir := viewState.LightDir
+		if viewState.LightMode {
+			lightDir = viewState.PendingLight
+		}
+
+		// Draw mesh based on render mode
+		switch viewState.RenderMode {
+		case RenderModeWireframe:
+			// X-ray wireframe mode
+			rasterizer.DrawMeshWireframe(mesh, transform, render.RGB(0, 255, 128))
+		case RenderModeFlat:
+			// Flat shading (no texture)
+			rasterizer.DrawMeshGouraud(mesh, transform, render.RGB(200, 200, 200), lightDir)
+		default:
+			// Textured mode
+			if viewState.TextureEnabled {
+				rasterizer.DrawMeshTexturedGouraud(mesh, transform, texture, lightDir)
+			} else {
+				rasterizer.DrawMeshGouraud(mesh, transform, render.RGB(200, 200, 200), lightDir)
+			}
+		}
 
 		// Display
 		termRenderer.Render(fb)
