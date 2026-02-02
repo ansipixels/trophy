@@ -47,7 +47,7 @@ var (
 
 func main() {
 	cmd := &cobra.Command{
-		Use:   "trophy <model.obj|model.glb>",
+		Use:   "trophy <model.obj|model.glb|model.stl>",
 		Short: "Terminal 3D Model Viewer",
 		Long: `trophy - Terminal 3D Model Viewer
 
@@ -77,7 +77,7 @@ Controls:
 
 	// Add info subcommand
 	infoCmd := &cobra.Command{
-		Use:   "info <model.obj|model.glb>",
+		Use:   "info <model.obj|model.glb|model.stl>",
 		Short: "Display model information",
 		Long:  "Display detailed information about a 3D model file including format, polygon count, vertex count, and bounding box.",
 		Args:  cobra.ExactArgs(1),
@@ -122,8 +122,13 @@ func runInfo(modelPath string) error {
 		if err != nil {
 			return fmt.Errorf("load model: %w", err)
 		}
+	case ".stl":
+		mesh, err = models.LoadSTL(modelPath)
+		if err != nil {
+			return fmt.Errorf("load model: %w", err)
+		}
 	default:
-		return fmt.Errorf("unsupported format: %s (use .obj or .glb)", ext)
+		return fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
 	}
 
 	mesh.CalculateBounds()
@@ -436,8 +441,13 @@ func run(modelPath string) error {
 		if err != nil {
 			return fmt.Errorf("load model: %w", err)
 		}
+	case ".stl":
+		mesh, err = models.LoadSTL(modelPath)
+		if err != nil {
+			return fmt.Errorf("load model: %w", err)
+		}
 	default:
-		return fmt.Errorf("unsupported format: %s (use .obj or .glb)", ext)
+		return fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
 	}
 
 	// Generate fallback texture if none

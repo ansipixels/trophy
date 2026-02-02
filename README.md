@@ -1,12 +1,12 @@
 # Trophy 🏆
 
-Terminal 3D Model Viewer - View OBJ and GLB files directly in your terminal.
+Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your terminal.
 
 ![Trophy Demo](docs/demo.gif)
 
 ## Features
 
-- **OBJ & GLB Support** - Load standard 3D model formats
+- **OBJ, GLB & STL Support** - Load standard 3D model formats
 - **Embedded Textures** - Automatically extracts and applies GLB textures
 - **Interactive Controls** - Rotate, zoom, and spin models with mouse/keyboard
 - **Software Rendering** - No GPU required, works over SSH
@@ -23,6 +23,7 @@ go install github.com/taigrr/trophy/cmd/trophy@latest
 ```bash
 trophy model.glb              # View a GLB model
 trophy model.obj              # View an OBJ model
+trophy model.stl              # View an STL model
 trophy -texture tex.png model.obj  # Apply custom texture
 trophy -bg 0,0,0 model.glb    # Black background
 trophy -fps 60 model.glb      # Higher framerate
@@ -78,7 +79,7 @@ rasterizer.DrawMeshTexturedOpt(mesh, transform, texture, lightDir)
 ## Packages
 
 - `pkg/math3d` - 3D math (Vec2, Vec3, Vec4, Mat4)
-- `pkg/models` - Model loaders (OBJ, GLB/GLTF)
+- `pkg/models` - Model loaders (OBJ, GLB/GLTF, STL)
 - `pkg/render` - Software rasterizer, camera, textures
 
 ## Benchmarks
