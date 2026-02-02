@@ -72,7 +72,7 @@ func (r *Rasterizer) DrawTriangleGouraudOpt(tri Triangle, lightDir math3d.Vec3) 
 	edge2X := sv[2].X - sv[0].X
 	edge2Y := sv[2].Y - sv[0].Y
 	cross := edge1X*edge2Y - edge1Y*edge2X
-	if cross < 0 {
+	if cross < 0 && !r.DisableBackfaceCulling {
 		return
 	}
 
@@ -241,7 +241,7 @@ func (r *Rasterizer) DrawTriangleTexturedOpt(tri Triangle, tex *Texture, lightDi
 	edge2X := sv[2].X - sv[0].X
 	edge2Y := sv[2].Y - sv[0].Y
 	cross := edge1X*edge2Y - edge1Y*edge2X
-	if cross < 0 {
+	if cross < 0 && !r.DisableBackfaceCulling {
 		return
 	}
 

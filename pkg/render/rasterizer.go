@@ -22,14 +22,15 @@ type Triangle struct {
 
 // Rasterizer handles software triangle rasterization.
 type Rasterizer struct {
-	camera       *Camera
-	fb           *Framebuffer
-	zbuffer      []float64 // Depth buffer (1D array, row-major)
-	width        int
-	height       int
-	frustum      Frustum      // Cached frustum planes
-	frustumDirty bool         // Whether frustum needs recalculation
-	CullingStats CullingStats // Statistics for debugging/benchmarking
+	camera                *Camera
+	fb                    *Framebuffer
+	zbuffer               []float64 // Depth buffer (1D array, row-major)
+	width                 int
+	height                int
+	frustum               Frustum      // Cached frustum planes
+	frustumDirty          bool         // Whether frustum needs recalculation
+	CullingStats          CullingStats // Statistics for debugging/benchmarking
+	DisableBackfaceCulling bool        // If true, render both sides of triangles
 }
 
 // CullingStats tracks frustum culling performance.

@@ -31,21 +31,22 @@ trophy -fps 60 model.glb      # Higher framerate
 
 ## Controls
 
-| Input        | Action             |
-| ------------ | ------------------ |
-| Mouse drag   | Rotate model       |
-| Scroll wheel | Zoom in/out        |
-| W/S          | Pitch up/down      |
-| A/D          | Yaw left/right     |
-| Q/E          | Roll               |
-| Space        | Toggle spin mode   |
-| +/-          | Zoom               |
-| R            | Reset view         |
-| T            | Toggle texture     |
-| X            | Toggle wireframe   |
-| L            | Position light     |
-| ?            | Toggle HUD overlay |
-| Esc          | Quit               |
+| Input        | Action                |
+| ------------ | --------------------- |
+| Mouse drag   | Rotate model          |
+| Scroll wheel | Zoom in/out           |
+| W/S          | Pitch up/down         |
+| A/D          | Yaw left/right        |
+| Q/E          | Roll                  |
+| Space        | Toggle spin mode      |
+| +/-          | Zoom                  |
+| R            | Reset view            |
+| T            | Toggle texture        |
+| X            | Toggle wireframe      |
+| B            | Toggle backface cull  |
+| L            | Position light        |
+| ?            | Toggle HUD overlay    |
+| Esc          | Quit                  |
 
 ## Lighting
 

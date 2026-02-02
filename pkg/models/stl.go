@@ -17,13 +17,37 @@ import (
 // STLLoader loads STL (stereolithography) files in both ASCII and binary formats.
 type STLLoader struct {
 	// Options
-	SmoothNormals bool // If true, average normals per-vertex for smooth shading
+	SmoothNormals   bool    // If true, average normals per-vertex for smooth shading
+	NoDedupe        bool    // If true, don't deduplicate vertices (each triangle gets its own)
+	CleanMesh       bool    // If true, clean mesh after loading (remove degenerate/duplicate/internal faces)
+	MergeTolerance  float64 // Tolerance for vertex merging (default 1e-6, 0 = exact match)
+}
+
+// quantizedKey creates a hashable key from a position by quantizing to a grid.
+// This handles floating point precision issues when comparing vertices.
+type quantizedKey struct {
+	x, y, z int64
+}
+
+func quantizePosition(pos math3d.Vec3, tolerance float64) quantizedKey {
+	if tolerance <= 0 {
+		// Use very high precision for "exact" matching
+		// This effectively matches the original Vec3 map behavior
+		tolerance = 1e-12
+	}
+	scale := 1.0 / tolerance
+	return quantizedKey{
+		x: int64(math.Round(pos.X * scale)),
+		y: int64(math.Round(pos.Y * scale)),
+		z: int64(math.Round(pos.Z * scale)),
+	}
 }
 
 // NewSTLLoader creates a new STL loader with default settings.
 func NewSTLLoader() *STLLoader {
 	return &STLLoader{
-		SmoothNormals: false,
+		SmoothNormals:  false,
+		MergeTolerance: 0, // 0 = exact matching (safest default)
 	}
 }
 
@@ -95,8 +119,9 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 
 	mesh := NewMesh(name)
 
-	// Vertex deduplication map
-	vertexMap := make(map[math3d.Vec3]int)
+	// Vertex deduplication map using quantized positions for tolerance-based matching
+	// This handles floating point precision issues from float32 STL data
+	vertexMap := make(map[quantizedKey]int)
 
 	offset := 84
 	for i := uint32(0); i < triCount; i++ {
@@ -118,33 +143,58 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 			)
 			offset += 12
 
-			// Deduplicate vertex
-			if idx, exists := vertexMap[pos]; exists {
-				faceVerts[v] = idx
-			} else {
+			if l.NoDedupe {
+				// No deduplication: each vertex is unique
 				idx := len(mesh.Vertices)
 				mesh.Vertices = append(mesh.Vertices, MeshVertex{
 					Position: pos,
 					Normal:   normal,
 				})
-				vertexMap[pos] = idx
 				faceVerts[v] = idx
+			} else {
+				// Deduplicate vertex using quantized key for tolerance-based matching
+				key := quantizePosition(pos, l.MergeTolerance)
+				if idx, exists := vertexMap[key]; exists {
+					faceVerts[v] = idx
+					// Accumulate normal for averaging later
+					mesh.Vertices[idx].Normal = mesh.Vertices[idx].Normal.Add(normal)
+				} else {
+					idx := len(mesh.Vertices)
+					mesh.Vertices = append(mesh.Vertices, MeshVertex{
+						Position: pos,
+						Normal:   normal,
+					})
+					vertexMap[key] = idx
+					faceVerts[v] = idx
+				}
 			}
 		}
 
 		// Skip 2-byte attribute byte count
 		offset += 2
 
+		// Reverse winding to match GLTF/OBJ loaders (swap indices 1 and 2)
 		mesh.Faces = append(mesh.Faces, Face{
-			V:        faceVerts,
+			V:        [3]int{faceVerts[0], faceVerts[2], faceVerts[1]},
 			Material: -1,
 		})
+	}
+
+	// Normalize accumulated normals (unless NoDedupe was used)
+	if !l.NoDedupe {
+		for i := range mesh.Vertices {
+			mesh.Vertices[i].Normal = mesh.Vertices[i].Normal.Normalize()
+		}
 	}
 
 	mesh.CalculateBounds()
 
 	if l.SmoothNormals {
 		mesh.CalculateSmoothNormals()
+	}
+
+	if l.CleanMesh {
+		mesh.CleanMesh()
 	}
 
 	return mesh, nil
@@ -160,8 +210,8 @@ func readFloat32LE(data []byte) float32 {
 func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 	mesh := NewMesh(name)
 
-	// Vertex deduplication map
-	vertexMap := make(map[math3d.Vec3]int)
+	// Vertex deduplication map using quantized positions for tolerance-based matching
+	vertexMap := make(map[quantizedKey]int)
 
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	lineNum := 0
@@ -237,17 +287,30 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 
 			pos := math3d.V3(x, y, z)
 
-			// Deduplicate vertex
-			if idx, exists := vertexMap[pos]; exists {
-				faceVerts = append(faceVerts, idx)
-			} else {
+			if l.NoDedupe {
+				// No deduplication: each vertex is unique
 				idx := len(mesh.Vertices)
 				mesh.Vertices = append(mesh.Vertices, MeshVertex{
 					Position: pos,
 					Normal:   currentNormal,
 				})
-				vertexMap[pos] = idx
 				faceVerts = append(faceVerts, idx)
+			} else {
+				// Deduplicate vertex using quantized key for tolerance-based matching
+				key := quantizePosition(pos, l.MergeTolerance)
+				if idx, exists := vertexMap[key]; exists {
+					faceVerts = append(faceVerts, idx)
+					// Accumulate normal for averaging later
+					mesh.Vertices[idx].Normal = mesh.Vertices[idx].Normal.Add(currentNormal)
+				} else {
+					idx := len(mesh.Vertices)
+					mesh.Vertices = append(mesh.Vertices, MeshVertex{
+						Position: pos,
+						Normal:   currentNormal,
+					})
+					vertexMap[key] = idx
+					faceVerts = append(faceVerts, idx)
+				}
 			}
 
 		case "endloop":
@@ -255,8 +318,9 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 
 		case "endfacet":
 			if len(faceVerts) >= 3 {
+				// Reverse winding to match GLTF/OBJ loaders (swap indices 1 and 2)
 				mesh.Faces = append(mesh.Faces, Face{
-					V:        [3]int{faceVerts[0], faceVerts[1], faceVerts[2]},
+					V:        [3]int{faceVerts[0], faceVerts[2], faceVerts[1]},
 					Material: -1,
 				})
 			}
@@ -275,10 +339,21 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 		return nil, fmt.Errorf("error reading ASCII STL: %w", err)
 	}
 
+	// Normalize accumulated normals (unless NoDedupe was used)
+	if !l.NoDedupe {
+		for i := range mesh.Vertices {
+			mesh.Vertices[i].Normal = mesh.Vertices[i].Normal.Normalize()
+		}
+	}
+
 	mesh.CalculateBounds()
 
 	if l.SmoothNormals {
 		mesh.CalculateSmoothNormals()
+	}
+
+	if l.CleanMesh {
+		mesh.CleanMesh()
 	}
 
 	return mesh, nil
@@ -293,5 +368,13 @@ func LoadSTL(path string) (*Mesh, error) {
 func LoadSTLSmooth(path string) (*Mesh, error) {
 	loader := NewSTLLoader()
 	loader.SmoothNormals = true
+	return loader.LoadFile(path)
+}
+
+// LoadSTLClean loads an STL file and cleans the mesh.
+// This removes degenerate faces, duplicate faces, and internal geometry.
+func LoadSTLClean(path string) (*Mesh, error) {
+	loader := NewSTLLoader()
+	loader.CleanMesh = true
 	return loader.LoadFile(path)
 }

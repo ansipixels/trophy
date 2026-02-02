@@ -234,6 +234,7 @@ type ViewState struct {
 	PendingLight   math3d.Vec3 // Light direction while positioning
 	ShowHUD        bool        // Whether to show the HUD overlay
 	SpinMode       bool        // Whether auto-spin is enabled
+	BackfaceCull   bool        // Whether to cull backfaces (true = cull, false = show both sides)
 }
 
 // NewViewState creates default view state
@@ -243,6 +244,7 @@ func NewViewState() *ViewState {
 		RenderMode:     RenderModeTextured,
 		LightMode:      false,
 		LightDir:       math3d.V3(0.5, 1, 0.3).Normalize(),
+		BackfaceCull:   false, // Default OFF - most STL files are single-sided shells
 	}
 }
 
@@ -565,6 +567,9 @@ func run(modelPath string) error {
 					// Enter light positioning mode
 					viewState.LightMode = true
 					viewState.PendingLight = viewState.LightDir
+				case ev.MatchString("b"):
+					// Toggle backface culling
+					viewState.BackfaceCull = !viewState.BackfaceCull
 				case ev.MatchString("?"), ev.MatchString("shift+/"):
 					// Toggle HUD
 					viewState.ShowHUD = !viewState.ShowHUD
@@ -679,6 +684,9 @@ func run(modelPath string) error {
 		if viewState.LightMode {
 			lightDir = viewState.PendingLight
 		}
+
+		// Set backface culling mode
+		rasterizer.DisableBackfaceCulling = !viewState.BackfaceCull
 
 		// Draw mesh based on render mode
 		switch viewState.RenderMode {
