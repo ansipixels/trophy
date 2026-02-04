@@ -503,10 +503,9 @@ func run(modelPath string) (err error) {
 				scr.Resize(ev.Width, ev.Height)
 				scrBounds = scr.Bounds()
 				fbWidth, fbHeight = scrBounds.Dx(), scrBounds.Dy()*2
-				fb = render.NewFramebuffer(fbWidth, fbHeight)
-				fb.BG = bg
-				rasterizer = render.NewRasterizer(camera, fb)
-				camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
+				fb.Resize(fbWidth, fbHeight)
+				rasterizer.Resize()
+				camera.SetAspectRatio(float64(fbWidth) / float64(fbHeight))
 
 			case uv.KeyPressEvent:
 				switch {
@@ -671,7 +670,7 @@ func run(modelPath string) (err error) {
 			Mul(math3d.RotateZ(rotation.Roll.Position))
 
 		// Render
-		fb.Clear(fb.BG)
+		fb.Clear()
 		rasterizer.ClearDepth()
 
 		// Choose light direction (pending if in light mode, otherwise current)
