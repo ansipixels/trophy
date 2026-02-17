@@ -358,6 +358,12 @@ func run(modelPath string) int {
 			viewState.LightMode = false
 		}
 	}
+	// Update framebuffer and camera aspect ratio on terminal resize
+	ap.OnResize = func() error {
+		fb.Resize(ap.W, ap.H*2)
+		camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
+		return nil
+	}
 
 	now := time.Now()
 	err = ap.FPSTicks(func() bool {
