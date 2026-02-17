@@ -55,13 +55,11 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 	if len(doc.Scenes) > 0 {
 		sceneIdx := 0
 		if doc.Scene != nil {
-			//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-			sceneIdx = int(*doc.Scene)
+			sceneIdx = *doc.Scene
 		}
 		scene := doc.Scenes[sceneIdx]
 		for _, nodeIdx := range scene.Nodes {
-			//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-			l.processNode(doc, int(nodeIdx), math3d.Identity(), mesh, processedMeshes)
+			l.processNode(doc, nodeIdx, math3d.Identity(), mesh, processedMeshes)
 		}
 	} else {
 		// No scenes defined, process all root nodes
@@ -69,8 +67,7 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 			isRoot := true
 			for _, n := range doc.Nodes {
 				for _, child := range n.Children {
-					//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-					if int(child) == i {
+					if child == i {
 						isRoot = false
 						break
 					}
@@ -152,8 +149,7 @@ func (l *GLTFLoader) processNode(
 	worldTransform := parentTransform.Mul(localTransform)
 
 	if node.Mesh != nil {
-		//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-		meshIdx := int(*node.Mesh)
+		meshIdx := *node.Mesh
 		gltfMesh := doc.Meshes[meshIdx]
 		_ = l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform)
 		processedMeshes[meshIdx] = true
@@ -199,8 +195,7 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 
 		materialIdx := -1
 		if prim.Material != nil {
-			//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-			materialIdx = int(*prim.Material)
+			materialIdx = *prim.Material
 		}
 
 		baseVertex := len(mesh.Vertices)
@@ -290,11 +285,9 @@ func extractMaterials(doc *gltf.Document, basePath string) []Material {
 			// Extract base color texture if present
 			if pbr.BaseColorTexture != nil {
 				texIdx := pbr.BaseColorTexture.Index
-				//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-				if int(texIdx) < len(doc.Textures) {
+				if texIdx < len(doc.Textures) {
 					tex := doc.Textures[texIdx]
-					//nolint:unconvert // uint32 to int conversion necessary for API compatibility
-					if tex.Source != nil && int(*tex.Source) < len(doc.Images) {
+					if tex.Source != nil && *tex.Source < len(doc.Images) {
 						img := doc.Images[*tex.Source]
 						texImg := loadGLTFImage(doc, img, basePath)
 						if texImg != nil {
