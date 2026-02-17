@@ -3,7 +3,7 @@ package render
 import (
 	"math"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // Camera represents a 3D camera with position and orientation.

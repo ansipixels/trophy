@@ -19,144 +19,47 @@
 package main
 
 import (
-	"context"
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
-	"github.com/charmbracelet/fang"
+	"fortio.org/cli"
+	"fortio.org/terminal/ansipixels"
+	"fortio.org/terminal/ansipixels/tcolor"
+	"github.com/ansipixels/trophy/math3d"
+	"github.com/ansipixels/trophy/models"
+	"github.com/ansipixels/trophy/render"
 	"github.com/charmbracelet/harmonica"
-	uv "github.com/charmbracelet/ultraviolet"
-	"github.com/charmbracelet/ultraviolet/screen"
-	"github.com/charmbracelet/x/ansi"
-	"github.com/spf13/cobra"
-	"github.com/taigrr/trophy/pkg/math3d"
-	"github.com/taigrr/trophy/pkg/models"
-	"github.com/taigrr/trophy/pkg/render"
 )
 
 var (
 	texturePath string
-	targetFPS   int
-	bgColor     string
+	targetFPS   float64
 )
 
 func main() {
-	cmd := &cobra.Command{
-		Use:   "trophy <model.obj|model.glb|model.stl>",
-		Short: "Terminal 3D Model Viewer",
-		Long: `trophy - Terminal 3D Model Viewer
+	flag.StringVar(&texturePath, "texture", "", "Path to texture image (PNG/JPG)")
+	flag.Float64Var(&targetFPS, "fps", 60, "Target FPS")
 
-View OBJ and GLB files in your terminal with full 3D rendering.
+	cli.ProgramName = "trophy"
+	cli.ArgsHelp = "<model.obj|model.glb|model.stl>"
+	cli.MinArgs = 1
+	cli.MaxArgs = 1
 
-Controls:
-  Mouse drag  - Rotate model
-  Scroll      - Zoom in/out
-  W/S/A/D     - Pitch and yaw
-  Q/E         - Roll left/right
-  Space       - Random spin
-  R           - Reset view
-  T           - Toggle texture
-  X           - Toggle wireframe
-  L           - Position light (mouse to aim, click to set)
-  ?           - Toggle HUD overlay
-  Esc         - Quit`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(args[0])
-		},
+	cli.Main()
+
+	// At this point, cli.Main has validated arguments
+	modelPath := flag.Args()[0]
+
+	if err := run(modelPath); err != nil {
+		fmt.Fprintf(flag.CommandLine.Output(), "Error: %v\n", err)
+		cli.ExitFunction(1)
 	}
-
-	cmd.Flags().StringVar(&texturePath, "texture", "", "Path to texture image (PNG/JPG)")
-	cmd.Flags().IntVar(&targetFPS, "fps", 60, "Target FPS")
-	cmd.Flags().StringVar(&bgColor, "bg", "", "Background color (R,G,B)")
-
-	// Add info subcommand
-	infoCmd := &cobra.Command{
-		Use:   "info <model.obj|model.glb|model.stl>",
-		Short: "Display model information",
-		Long:  "Display detailed information about a 3D model file including format, polygon count, vertex count, and bounding box.",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInfo(args[0])
-		},
-	}
-	cmd.AddCommand(infoCmd)
-
-	if err := fang.Execute(context.Background(), cmd); err != nil {
-		os.Exit(1)
-	}
-}
-
-func runInfo(modelPath string) error {
-	ext := strings.ToLower(filepath.Ext(modelPath))
-
-	// Check file exists
-	info, err := os.Stat(modelPath)
-	if err != nil {
-		return fmt.Errorf("cannot access file: %w", err)
-	}
-
-	var mesh *models.Mesh
-	var hasEmbeddedTexture bool
-	var textureSize string
-
-	switch ext {
-	case ".glb", ".gltf":
-		var img image.Image
-		mesh, img, err = models.LoadGLBWithTexture(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-		if img != nil {
-			hasEmbeddedTexture = true
-			bounds := img.Bounds()
-			textureSize = fmt.Sprintf("%dx%d", bounds.Dx(), bounds.Dy())
-		}
-	case ".obj":
-		mesh, err = models.LoadOBJ(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-	case ".stl":
-		mesh, err = models.LoadSTL(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
-	}
-
-	mesh.CalculateBounds()
-	size := mesh.Size()
-	center := mesh.Center()
-
-	// Format output
-	fmt.Printf("File:       %s\n", filepath.Base(modelPath))
-	fmt.Printf("Format:     %s\n", strings.ToUpper(strings.TrimPrefix(ext, ".")))
-	fmt.Printf("Size:       %.2f KB\n", float64(info.Size())/1024)
-	fmt.Println()
-	fmt.Printf("Vertices:   %d\n", mesh.VertexCount())
-	fmt.Printf("Triangles:  %d\n", mesh.TriangleCount())
-	fmt.Println()
-	fmt.Printf("Bounds Min: (%.3f, %.3f, %.3f)\n", mesh.BoundsMin.X, mesh.BoundsMin.Y, mesh.BoundsMin.Z)
-	fmt.Printf("Bounds Max: (%.3f, %.3f, %.3f)\n", mesh.BoundsMax.X, mesh.BoundsMax.Y, mesh.BoundsMax.Z)
-	fmt.Printf("Dimensions: %.3f x %.3f x %.3f\n", size.X, size.Y, size.Z)
-	fmt.Printf("Center:     (%.3f, %.3f, %.3f)\n", center.X, center.Y, center.Z)
-
-	if hasEmbeddedTexture {
-		fmt.Println()
-		fmt.Printf("Texture:    embedded (%s)\n", textureSize)
-	}
-
-	return nil
 }
 
 // RotationAxis tracks position and velocity for one rotation axis with spring decay
@@ -282,43 +185,28 @@ func (h *HUD) UpdateFPS() {
 	}
 }
 
-// Draw draws the HUD overlay directly to the terminal
-func (h *HUD) Draw(scr uv.Screen, area uv.Rectangle) {
-	ctx := screen.NewContext(scr)
-	ctx.SetBackground(ansi.Black)
-
-	// Light mode always shows its indicator
+// Draw renders the HUD overlay to the terminal using ansipixels
+func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.LightMode {
-		ctx.SetBold(true)
-		ctx.SetForeground(ansi.BrightYellow)
-		ctx.SetPosition(max(area.Dx()-60, 0)/2, area.Dy()-1)
-		ctx.Print(" ◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel ")
+		// Light mode indicator
+		ap.WriteAtStr(0, ap.H-1, "◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel")
 		return
 	}
 
-	// If HUD is disabled, we're done (lines already cleared)
 	if !h.state.ShowHUD {
 		return
 	}
 
 	// Top left: FPS
-	ctx.SetBold(false)
-	ctx.SetForeground(ansi.BrightGreen)
-	ctx.SetPosition(0, 0)
-	ctx.Printf(" %.0f FPS ", h.fps)
+	ap.WriteAt(0, 0, tcolor.Green.Foreground()+"%.0f FPS "+tcolor.Reset, h.fps)
 
 	// Top middle: filename
-	ctx.SetBold(true)
-	ctx.SetForeground(ansi.BrightWhite)
-	ctx.SetPosition(max((area.Dx()-len(h.filename)-2)/2, 0), 0)
-	ctx.Printf(" %s ", h.filename)
+	ap.WriteCentered(0, "%s", h.filename)
 
 	// Top right: polygon count
-	ctx.SetForeground(ansi.BrightCyan)
-	ctx.SetPosition(max(area.Dx()-12, 0), 0)
-	ctx.Printf(" %d polys ", h.polyCount)
+	ap.WriteRight(0, tcolor.Cyan.Foreground()+"%d polys"+tcolor.Reset, h.polyCount)
 
-	// Bottom: mode checkboxes and hint
+	// Bottom: mode indicators
 	checkTex := "[ ]"
 	if h.state.TextureEnabled && h.state.RenderMode != RenderModeWireframe {
 		checkTex = "[✓]"
@@ -328,17 +216,10 @@ func (h *HUD) Draw(scr uv.Screen, area uv.Rectangle) {
 		checkWire = "[✓]"
 	}
 
-	// Bottom: Mode checkboxes and hint
-	ctx.SetBold(false)
-	ctx.SetForeground(ansi.BrightWhite)
-	ctx.SetPosition(0, area.Dy()-1)
-	ctx.Printf(" %s Texture  %s X-Ray (wireframe) ", checkTex, checkWire)
+	ap.WriteAt(0, ap.H-1, "%s Texture  %s X-Ray (wireframe)", checkTex, checkWire)
 
-	// Light hint (right side of bottom)
-	ctx.SetFaint(true)
-	ctx.SetForeground(ansi.BrightYellow)
-	ctx.SetPosition(max(area.Dx()-19, 0), area.Dy()-1)
-	ctx.Printf(" L: position light ")
+	// Bottom right: light hint
+	ap.WriteRight(ap.H-1, tcolor.Yellow.Foreground()+"L: position light"+tcolor.Reset)
 }
 
 // ScreenToLightDir converts a screen position to a light direction.
@@ -365,31 +246,32 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 }
 
 func run(modelPath string) (err error) {
-	// Parse background color
-	var bg color.RGBA
-	if bgColor != "" {
-		fmt.Sscanf(bgColor, "%d,%d,%d", &bg.R, &bg.G, &bg.B)
-		bg.A = 255
+	// Initialize ansipixels for terminal rendering
+	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
+	if err := ap.Open(); err != nil {
+		return fmt.Errorf("open ansipixels: %w", err)
+	}
+	defer func() {
+		ap.ShowCursor()
+		ap.MouseTrackingOff()
+		ap.Out.Flush()
+		ap.Restore()
+	}()
+	ap.SyncBackgroundColor()
+	ap.MouseTrackingOn()
+	ap.HideCursor()
+
+	// Get terminal dimensions
+	termWidth := ap.W
+	termHeight := ap.H
+	if termWidth <= 0 || termHeight <= 0 {
+		return fmt.Errorf("invalid terminal size: %dx%d", termWidth, termHeight)
 	}
 
-	// Create terminal
-	term := uv.DefaultTerminal()
-	scr := term.Screen()
-	scrBounds := scr.Bounds()
-
-	if err := term.Start(); err != nil {
-		return fmt.Errorf("start terminal: %w", err)
-	}
-
-	scr.EnterAltScreen()
-	scr.HideCursor()
-
-	// Enable mouse mode
-	scr.SetMouseMode(uv.MouseModeMotion)
-
-	// Create renderer
-	fb := render.NewFramebuffer(scrBounds.Dx(), scrBounds.Dy()*2)
-	fb.BG = bg
+	// Create renderer with framebuffer sized for terminal
+	// Using 2x height for half-block characters
+	fb := render.NewFramebuffer(termWidth, termHeight*2)
+	fb.BG = color.RGBA{ap.Background.R, ap.Background.G, ap.Background.B, 255}
 
 	// Create camera
 	camera := render.NewCamera()
@@ -448,7 +330,7 @@ func run(modelPath string) (err error) {
 	fmt.Printf("Loaded: %s (%d vertices, %d triangles)\n", filepath.Base(modelPath), mesh.VertexCount(), mesh.TriangleCount())
 
 	// Initialize rotation and view state
-	rotation := NewRotationState(targetFPS)
+	rotation := NewRotationState(int(math.Round(targetFPS)))
 	viewState := NewViewState()
 
 	// Create HUD
@@ -464,174 +346,29 @@ func run(modelPath string) (err error) {
 		transform := math3d.Scale(math3d.V3(scale, scale, scale)).Mul(math3d.Translate(center.Scale(-1)))
 		mesh.Transform(transform)
 	}
-
-	// Context for clean shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		cancel()
-	}()
-
 	// Input state
 	inputTorque := struct{ pitch, yaw, roll float64 }{}
 	const torqueStrength = 3.0
-
-	// Mouse state
-	var mouseDown bool
-	var lastMouseX, lastMouseY int
-	cameraZ := 5.0
-
-	// Event handler
-	go func() {
-		for ev := range term.Events() {
-			switch ev := ev.(type) {
-			case uv.WindowSizeEvent:
-				scr.Resize(ev.Width, ev.Height)
-				scrBounds = scr.Bounds()
-				fb.Resize(scrBounds.Dx(), scrBounds.Dy()*2)
-				rasterizer.Resize()
-				camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
-
-			case uv.KeyPressEvent:
-				switch {
-				case ev.MatchString("escape"):
-					if viewState.LightMode {
-						// Cancel light positioning mode
-						viewState.LightMode = false
-					} else {
-						cancel()
-						return
-					}
-				case ev.MatchString("ctrl+c"):
-					cancel()
-					return
-				case ev.MatchString("q"):
-					inputTorque.roll = -torqueStrength
-				case ev.MatchString("r"):
-					rotation.Reset()
-					cameraZ = 5.0
-					camera.SetPosition(math3d.V3(0, 0, cameraZ))
-				case ev.MatchString("w", "up"):
-					inputTorque.pitch = -torqueStrength
-				case ev.MatchString("s", "down"):
-					inputTorque.pitch = torqueStrength
-				case ev.MatchString("a", "left"):
-					inputTorque.yaw = -torqueStrength
-				case ev.MatchString("d", "right"):
-					inputTorque.yaw = torqueStrength
-				case ev.MatchString("e"):
-					inputTorque.roll = torqueStrength
-				case ev.MatchString("space"):
-					// Toggle spin mode
-					viewState.SpinMode = !viewState.SpinMode
-					if viewState.SpinMode {
-						// Set a gentle constant spin
-						rotation.Yaw.Velocity = 0.02
-					}
-				case ev.MatchString("+", "="):
-					cameraZ = math.Max(1, cameraZ-0.5)
-					camera.SetPosition(math3d.V3(0, 0, cameraZ))
-				case ev.MatchString("-", "_"):
-					cameraZ = math.Min(20, cameraZ+0.5)
-					camera.SetPosition(math3d.V3(0, 0, cameraZ))
-				case ev.MatchString("t"):
-					// Toggle texture
-					viewState.TextureEnabled = !viewState.TextureEnabled
-				case ev.MatchString("x"):
-					// Toggle wireframe mode
-					if viewState.RenderMode == RenderModeWireframe {
-						viewState.RenderMode = RenderModeTextured
-					} else {
-						viewState.RenderMode = RenderModeWireframe
-					}
-				case ev.MatchString("l"):
-					// Enter light positioning mode
-					viewState.LightMode = true
-					viewState.PendingLight = viewState.LightDir
-				case ev.MatchString("b"):
-					// Toggle backface culling
-					viewState.BackfaceCull = !viewState.BackfaceCull
-				case ev.MatchString("?"), ev.MatchString("shift+/"):
-					// Toggle HUD
-					viewState.ShowHUD = !viewState.ShowHUD
-				}
-
-			case uv.KeyReleaseEvent:
-				switch {
-				case ev.MatchString("w"), ev.MatchString("up"), ev.MatchString("s"), ev.MatchString("down"):
-					inputTorque.pitch = 0
-				case ev.MatchString("a"), ev.MatchString("left"), ev.MatchString("d"), ev.MatchString("right"):
-					inputTorque.yaw = 0
-				case ev.MatchString("q"), ev.MatchString("e"):
-					inputTorque.roll = 0
-				}
-
-			case uv.MouseClickEvent:
-				if viewState.LightMode {
-					// Set light position and exit light mode
-					viewState.LightDir = viewState.PendingLight
-					viewState.LightMode = false
-				} else {
-					mouseDown = true
-					lastMouseX, lastMouseY = ev.X, ev.Y
-				}
-
-			case uv.MouseReleaseEvent:
-				if !viewState.LightMode {
-					mouseDown = false
-				}
-
-			case uv.MouseMotionEvent:
-				if viewState.LightMode {
-					// Update pending light direction based on mouse position
-					viewState.PendingLight = viewState.ScreenToLightDir(ev.X, ev.Y, scrBounds.Dx(), scrBounds.Dy())
-				} else if mouseDown {
-					dx := ev.X - lastMouseX
-					dy := ev.Y - lastMouseY
-					rotation.ApplyImpulse(float64(dy)*0.03, float64(dx)*0.03, 0)
-					lastMouseX, lastMouseY = ev.X, ev.Y
-				}
-
-			case uv.MouseWheelEvent:
-				switch ev.Button {
-				case uv.MouseWheelUp:
-					cameraZ -= 0.5
-					if cameraZ < 1 {
-						cameraZ = 1
-					}
-				case uv.MouseWheelDown:
-					cameraZ += 0.5
-					if cameraZ > 20 {
-						cameraZ = 20
-					}
-				}
-				camera.SetPosition(math3d.V3(0, 0, cameraZ))
-			}
-		}
-	}()
 
 	// Main loop
 	targetDuration := time.Second / time.Duration(targetFPS)
 	lastFrame := time.Now()
 
-	cleanup := func() {
-		// This will reset the terminal to normal state
-		// i.e. mouse off, exit alt screen, show cursor
-		_ = term.Stop()
+	ap.OnMouse = func() {
+		if !viewState.LightMode {
+			return
+		}
+		// Convert screen coordinates to light direction
+		viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, termWidth, termHeight)
+
+		// Check for mouse click to confirm light position
+		if ap.MouseRelease() {
+			viewState.LightDir = viewState.PendingLight
+			viewState.LightMode = false
+		}
 	}
 
 	for {
-		select {
-		case <-ctx.Done():
-			cleanup()
-			return nil
-		default:
-		}
-
 		now := time.Now()
 		dt := now.Sub(lastFrame).Seconds()
 		lastFrame = now
@@ -640,7 +377,73 @@ func run(modelPath string) (err error) {
 			dt = 0.1
 		}
 
-		// Apply input torque and decay it (key release events unreliable)
+		// Read input
+		_, err := ap.ReadOrResizeOrSignalOnce()
+		if err != nil {
+			return fmt.Errorf("input error: %w", err)
+		}
+		// Process keyboard input from ap.Data
+		if len(ap.Data) > 0 {
+			for _, b := range ap.Data {
+				switch b {
+				case 'q', 'Q':
+					inputTorque.roll = -torqueStrength
+				case 'e', 'E':
+					inputTorque.roll = torqueStrength
+				case 'w', 'W':
+					inputTorque.pitch = -torqueStrength
+				case 's', 'S':
+					inputTorque.pitch = torqueStrength
+				case 'a', 'A':
+					inputTorque.yaw = -torqueStrength
+				case 'd', 'D':
+					inputTorque.yaw = torqueStrength
+				case 'r', 'R':
+					rotation.Reset()
+					camera.SetPosition(math3d.V3(0, 0, 5))
+				case 't', 'T':
+					// Toggle texture
+					viewState.TextureEnabled = !viewState.TextureEnabled
+				case 'x', 'X':
+					// Toggle wireframe mode
+					if viewState.RenderMode == RenderModeWireframe {
+						viewState.RenderMode = RenderModeTextured
+					} else {
+						viewState.RenderMode = RenderModeWireframe
+					}
+				case 'l', 'L':
+					// Enter light positioning mode
+					viewState.LightMode = true
+					viewState.PendingLight = viewState.LightDir
+				case 'b', 'B':
+					// Toggle backface culling
+					viewState.BackfaceCull = !viewState.BackfaceCull
+				case '?':
+					// Toggle HUD
+					viewState.ShowHUD = !viewState.ShowHUD
+				case '+', '=':
+					// Zoom in
+					camera.SetPosition(math3d.V3(0, 0, math.Max(1, camera.Position.Z-0.5)))
+				case '-', '_':
+					// Zoom out
+					camera.SetPosition(math3d.V3(0, 0, math.Min(20, camera.Position.Z+0.5)))
+				case ' ':
+					// Toggle spin mode
+					viewState.SpinMode = !viewState.SpinMode
+					if viewState.SpinMode {
+						rotation.Yaw.Velocity = 0.02
+					}
+				case 27: // Escape
+					if viewState.LightMode {
+						viewState.LightMode = false
+					} else {
+						return nil
+					}
+				}
+			}
+		}
+
+		// Apply input torque and decay it
 		rotation.ApplyImpulse(
 			inputTorque.pitch*dt,
 			inputTorque.yaw*dt,
@@ -688,18 +491,20 @@ func run(modelPath string) (err error) {
 			}
 		}
 
-		// Display
-		screen.Clear(scr)
-		fb.Draw(scr, scrBounds)
-		hud.Draw(scr, scrBounds)
-		scr.Render()
-		if err := scr.Flush(); err != nil {
-			cleanup()
-			return fmt.Errorf("flush: %w", err)
+		// Convert framebuffer to image for ansipixels
+		img := fb.ToImage()
+
+		// Display using ansipixels
+		ap.StartSyncMode()
+		ap.ClearScreen()
+		if err := ap.ShowScaledImage(img); err != nil {
+			return fmt.Errorf("show image: %w", err)
 		}
 
-		// HUD overlay (always update FPS, render clears lines when HUD off)
+		// HUD overlay
 		hud.UpdateFPS()
+		hud.Draw(ap)
+		ap.EndSyncMode()
 
 		// Frame timing
 		elapsed := time.Since(now)

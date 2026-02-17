@@ -4,7 +4,7 @@ package models
 import (
 	"image"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // Mesh represents a 3D mesh with vertices, faces, and materials.

@@ -15,7 +15,7 @@ Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your termina
 ## Installation
 
 ```bash
-go install github.com/taigrr/trophy/cmd/trophy@latest
+go install github.com/ansipixels/trophy@latest
 ```
 
 ## Usage
@@ -60,9 +60,9 @@ Trophy's rendering packages can be used as a library:
 
 ```go
 import (
-    "github.com/taigrr/trophy/pkg/models"
-    "github.com/taigrr/trophy/pkg/render"
-    "github.com/taigrr/trophy/pkg/math3d"
+    "github.com/ansipixels/trophy/models"
+    "github.com/ansipixels/trophy/render"
+    "github.com/ansipixels/trophy/math3d"
 )
 
 // Load a model
@@ -79,15 +79,15 @@ rasterizer.DrawMeshTexturedOpt(mesh, transform, texture, lightDir)
 
 ## Packages
 
-- `pkg/math3d` - 3D math (Vec2, Vec3, Vec4, Mat4)
-- `pkg/models` - Model loaders (OBJ, GLB/GLTF, STL)
-- `pkg/render` - Software rasterizer, camera, textures
+- `math3d` - 3D math (Vec2, Vec3, Vec4, Mat4)
+- `models` - Model loaders (OBJ, GLB/GLTF, STL)
+- `render` - Software rasterizer, camera, textures
 
 ## Benchmarks
 
 Run with `go test -bench=. -benchmem ./...`
 
-### Math (pkg/math3d)
+### Math (math3d)
 
 | Benchmark      | ns/op | B/op | allocs/op |
 | -------------- | ----: | ---: | --------: |
@@ -102,7 +102,7 @@ Run with `go test -bench=. -benchmem ./...`
 | LookAt         | 33.66 |    0 |         0 |
 | ViewProjection | 71.32 |    0 |         0 |
 
-### Rendering (pkg/render)
+### Rendering (render)
 
 | Benchmark                  |  ns/op | B/op | allocs/op |
 | -------------------------- | -----: | ---: | --------: |

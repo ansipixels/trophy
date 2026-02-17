@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // OBJLoader loads Wavefront OBJ files.

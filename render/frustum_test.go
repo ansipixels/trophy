@@ -4,7 +4,7 @@ import (
 	"math"
 	"testing"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 func TestPlaneDistanceToPoint(t *testing.T) {

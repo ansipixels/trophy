@@ -5,7 +5,7 @@ package render
 import (
 	"math"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // edgeFunction computes the signed area of the parallelogram formed by vertices.

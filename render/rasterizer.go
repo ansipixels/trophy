@@ -4,7 +4,7 @@ package render
 import (
 	"math"
 
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // Vertex represents a vertex with all attributes needed for rasterization.
