@@ -14,6 +14,8 @@ Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your termina
 
 ## Installation
 
+See the [binary releases](releases/) or
+
 ```bash
 go install github.com/ansipixels/trophy@latest
 ```
