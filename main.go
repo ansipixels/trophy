@@ -24,11 +24,13 @@ import (
 	"image"
 	"image/color"
 	"math"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
 	"fortio.org/cli"
+	"fortio.org/log"
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
 	"github.com/ansipixels/trophy/math3d"
@@ -55,11 +57,7 @@ func main() {
 
 	// At this point, cli.Main has validated arguments
 	modelPath := flag.Args()[0]
-
-	if err := run(modelPath); err != nil {
-		fmt.Fprintf(flag.CommandLine.Output(), "Error: %v\n", err)
-		cli.ExitFunction(1)
-	}
+	os.Exit(run(modelPath))
 }
 
 // RotationAxis tracks position and velocity for one rotation axis with spring decay
@@ -189,7 +187,7 @@ func (h *HUD) UpdateFPS() {
 func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.LightMode {
 		// Light mode indicator
-		ap.WriteAtStr(0, ap.H-1, "◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel")
+		ap.WriteAtStr(0, ap.H-1, tcolor.BrightYellow.Foreground()+"◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel")
 		return
 	}
 
@@ -245,11 +243,12 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 	return math3d.V3(nx, -ny, nz).Normalize()
 }
 
-func run(modelPath string) (err error) {
+func run(modelPath string) int {
 	// Initialize ansipixels for terminal rendering
 	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
-	if err := ap.Open(); err != nil {
-		return fmt.Errorf("open ansipixels: %w", err)
+	var err error
+	if err = ap.Open(); err != nil {
+		return log.FErrf("open ansipixels: %w", err)
 	}
 	defer func() {
 		ap.ShowCursor()
@@ -261,16 +260,9 @@ func run(modelPath string) (err error) {
 	ap.MouseTrackingOn()
 	ap.HideCursor()
 
-	// Get terminal dimensions
-	termWidth := ap.W
-	termHeight := ap.H
-	if termWidth <= 0 || termHeight <= 0 {
-		return fmt.Errorf("invalid terminal size: %dx%d", termWidth, termHeight)
-	}
-
 	// Create renderer with framebuffer sized for terminal
 	// Using 2x height for half-block characters
-	fb := render.NewFramebuffer(termWidth, termHeight*2)
+	fb := render.NewFramebuffer(ap.W, ap.H*2)
 	fb.BG = color.RGBA{ap.Background.R, ap.Background.G, ap.Background.B, 255}
 
 	// Create camera
@@ -288,7 +280,7 @@ func run(modelPath string) (err error) {
 	if texturePath != "" {
 		texture, err = render.LoadTexture(texturePath)
 		if err != nil {
-			fmt.Printf("Warning: could not load texture: %v\n", err)
+			return log.FErrf("Could not load texture: %v", err)
 		}
 	}
 
@@ -301,25 +293,25 @@ func run(modelPath string) (err error) {
 		var embeddedImg image.Image
 		mesh, embeddedImg, err = models.LoadGLBWithTexture(modelPath)
 		if err != nil {
-			return fmt.Errorf("load model: %w", err)
+			return log.FErrf("load model: %w", err)
 		}
 		// Use embedded texture if no explicit texture and one exists
 		if texture == nil && embeddedImg != nil {
 			texture = render.TextureFromImage(embeddedImg)
-			fmt.Printf("Using embedded texture: %dx%d\n", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
+			log.Infof("Using embedded texture: %dx%d", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
 		}
 	case ".obj":
 		mesh, err = models.LoadOBJ(modelPath)
 		if err != nil {
-			return fmt.Errorf("load model: %w", err)
+			return log.FErrf("load model: %w", err)
 		}
 	case ".stl":
 		mesh, err = models.LoadSTL(modelPath)
 		if err != nil {
-			return fmt.Errorf("load model: %w", err)
+			return log.FErrf("load model: %w", err)
 		}
 	default:
-		return fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
+		return log.FErrf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
 	}
 
 	// Generate fallback texture if none
@@ -351,7 +343,6 @@ func run(modelPath string) (err error) {
 	const torqueStrength = 3.0
 
 	// Main loop
-	targetDuration := time.Second / time.Duration(targetFPS)
 	lastFrame := time.Now()
 
 	ap.OnMouse = func() {
@@ -359,7 +350,7 @@ func run(modelPath string) (err error) {
 			return
 		}
 		// Convert screen coordinates to light direction
-		viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, termWidth, termHeight)
+		viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, ap.W, ap.H)
 
 		// Check for mouse click to confirm light position
 		if ap.MouseRelease() {
@@ -380,7 +371,7 @@ func run(modelPath string) (err error) {
 		// Read input
 		_, err := ap.ReadOrResizeOrSignalOnce()
 		if err != nil {
-			return fmt.Errorf("input error: %w", err)
+			return log.FErrf("input error: %w", err)
 		}
 		// Process keyboard input from ap.Data
 		if len(ap.Data) > 0 {
@@ -437,7 +428,7 @@ func run(modelPath string) (err error) {
 					if viewState.LightMode {
 						viewState.LightMode = false
 					} else {
-						return nil
+						return 0
 					}
 				}
 			}
@@ -498,18 +489,12 @@ func run(modelPath string) (err error) {
 		ap.StartSyncMode()
 		ap.ClearScreen()
 		if err := ap.ShowScaledImage(img); err != nil {
-			return fmt.Errorf("show image: %w", err)
+			return log.FErrf("show image: %w", err)
 		}
 
 		// HUD overlay
 		hud.UpdateFPS()
 		hud.Draw(ap)
 		ap.EndSyncMode()
-
-		// Frame timing
-		elapsed := time.Since(now)
-		if elapsed < targetDuration {
-			time.Sleep(targetDuration - elapsed)
-		}
 	}
 }
