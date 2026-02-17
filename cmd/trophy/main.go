@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"fortio.org/terminal/ansipixels"
+	"fortio.org/terminal/ansipixels/tcolor"
 	"github.com/charmbracelet/harmonica"
 	"github.com/spf13/cobra"
 	"github.com/taigrr/trophy/pkg/math3d"
@@ -289,19 +290,13 @@ func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	}
 
 	// Top left: FPS
-	ap.WriteAt(0, 0, "%.0f FPS ", h.fps)
+	ap.WriteAt(0, 0, tcolor.Green.Foreground()+"%.0f FPS "+tcolor.Reset, h.fps)
 
 	// Top middle: filename
-	midX := (ap.W - len(h.filename)) / 2
-	if midX > 0 {
-		ap.WriteAtStr(midX, 0, h.filename)
-	}
+	ap.WriteCentered(0, "%s", h.filename)
 
 	// Top right: polygon count
-	rightX := ap.W - 10 // Reserve space for "NNN polys"
-	if rightX > 0 {
-		ap.WriteAt(rightX, 0, "%d polys", h.polyCount)
-	}
+	ap.WriteRight(0, tcolor.Cyan.Foreground()+"%d polys"+tcolor.Reset, h.polyCount)
 
 	// Bottom: mode indicators
 	checkTex := "[ ]"
@@ -316,11 +311,7 @@ func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	ap.WriteAt(0, ap.H-1, "%s Texture  %s X-Ray (wireframe)", checkTex, checkWire)
 
 	// Bottom right: light hint
-	lightStr := "L: position light"
-	lightX := ap.W - len(lightStr)
-	if lightX > 0 {
-		ap.WriteAtStr(lightX, ap.H-1, lightStr)
-	}
+	ap.WriteRight(ap.H-1, tcolor.Yellow.Foreground()+"L: position light"+tcolor.Reset)
 }
 
 // ScreenToLightDir converts a screen position to a light direction.
