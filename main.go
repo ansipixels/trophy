@@ -187,7 +187,7 @@ func (h *HUD) UpdateFPS() {
 func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.LightMode {
 		// Light mode indicator
-		ap.WriteAtStr(0, ap.H-1, tcolor.BrightYellow.Foreground()+"◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel")
+		ap.WriteCentered(ap.H-1, "%s◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel%s", tcolor.BrightYellow.Foreground(), tcolor.Reset)
 		return
 	}
 
@@ -248,7 +248,7 @@ func run(modelPath string) int {
 	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
 	var err error
 	if err = ap.Open(); err != nil {
-		return log.FErrf("open ansipixels: %w", err)
+		return log.FErrf("open ansipixels: %v", err)
 	}
 	defer func() {
 		ap.ShowCursor()
@@ -293,7 +293,7 @@ func run(modelPath string) int {
 		var embeddedImg image.Image
 		mesh, embeddedImg, err = models.LoadGLBWithTexture(modelPath)
 		if err != nil {
-			return log.FErrf("load model: %w", err)
+			return log.FErrf("load model: %v", err)
 		}
 		// Use embedded texture if no explicit texture and one exists
 		if texture == nil && embeddedImg != nil {
@@ -303,12 +303,12 @@ func run(modelPath string) int {
 	case ".obj":
 		mesh, err = models.LoadOBJ(modelPath)
 		if err != nil {
-			return log.FErrf("load model: %w", err)
+			return log.FErrf("load model: %v", err)
 		}
 	case ".stl":
 		mesh, err = models.LoadSTL(modelPath)
 		if err != nil {
-			return log.FErrf("load model: %w", err)
+			return log.FErrf("load model: %v", err)
 		}
 	default:
 		return log.FErrf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
@@ -345,18 +345,39 @@ func run(modelPath string) int {
 	// Main loop
 	lastFrame := time.Now()
 
-	ap.OnMouse = func() {
-		if !viewState.LightMode {
-			return
-		}
-		// Convert screen coordinates to light direction
-		viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, ap.W, ap.H)
+	cameraZ := 5.0
+	lastMouseX, lastMouseY := 0, 0
 
-		// Check for mouse click to confirm light position
-		if ap.MouseRelease() {
-			viewState.LightDir = viewState.PendingLight
-			viewState.LightMode = false
+	ap.OnMouse = func() {
+		switch {
+		case ap.MouseWheelUp():
+			cameraZ -= 0.5
+			if cameraZ < 1 {
+				cameraZ = 1
+			}
+		case ap.MouseWheelDown():
+			cameraZ += 0.5
+			if cameraZ > 20 {
+				cameraZ = 20
+			}
+		case ap.LeftClick():
+		case ap.LeftDrag():
+			dx := ap.Mx - lastMouseX
+			dy := ap.My - lastMouseY
+			rotation.ApplyImpulse(float64(dy)*0.03, float64(dx)*0.03, 0)
 		}
+		camera.SetPosition(math3d.V3(0, 0, cameraZ))
+		if viewState.LightMode {
+			// Convert screen coordinates to light direction
+			viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, ap.W, ap.H)
+
+			// Check for mouse click to confirm light position
+			if ap.MouseRelease() {
+				viewState.LightDir = viewState.PendingLight
+				viewState.LightMode = false
+			}
+		}
+		lastMouseX, lastMouseY = ap.Mx, ap.My
 	}
 	// Update framebuffer and camera aspect ratio on terminal resize
 	ap.OnResize = func() error {
@@ -390,7 +411,8 @@ func run(modelPath string) int {
 					inputTorque.yaw = torqueStrength
 				case 'r', 'R':
 					rotation.Reset()
-					camera.SetPosition(math3d.V3(0, 0, 5))
+					cameraZ = 5.0
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
 				case 't', 'T':
 					// Toggle texture
 					viewState.TextureEnabled = !viewState.TextureEnabled
@@ -413,10 +435,12 @@ func run(modelPath string) int {
 					viewState.ShowHUD = !viewState.ShowHUD
 				case '+', '=':
 					// Zoom in
-					camera.SetPosition(math3d.V3(0, 0, math.Max(1, camera.Position.Z-0.5)))
+					cameraZ = max(1., cameraZ-0.5)
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
 				case '-', '_':
 					// Zoom out
-					camera.SetPosition(math3d.V3(0, 0, math.Min(20, camera.Position.Z+0.5)))
+					cameraZ = min(20., cameraZ+0.5)
+					camera.SetPosition(math3d.V3(0, 0, cameraZ))
 				case ' ':
 					// Toggle spin mode
 					viewState.SpinMode = !viewState.SpinMode
