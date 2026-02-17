@@ -32,5 +32,3 @@ jobs:
             dockerfile: "./Dockerfile"
         secrets:
             GH_PAT: ${{ secrets.GH_PAT }}
-            DOCKER_TOKEN: ${{ secrets.DOCKER_TOKEN }}
-            DOCKER_USER: ${{ secrets.DOCKER_USER }}
