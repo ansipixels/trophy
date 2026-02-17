@@ -19,16 +19,13 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"fortio.org/terminal/ansipixels"
@@ -365,10 +362,13 @@ func run(modelPath string) (err error) {
 		return fmt.Errorf("open ansipixels: %w", err)
 	}
 	defer func() {
-		ap.Restore()
 		ap.ShowCursor()
+		ap.MouseTrackingOff()
+		ap.Out.Flush()
+		ap.Restore()
 	}()
 	ap.SyncBackgroundColor()
+	ap.MouseTrackingOn()
 	ap.HideCursor()
 
 	// Get terminal dimensions
@@ -456,18 +456,6 @@ func run(modelPath string) (err error) {
 		transform := math3d.Scale(math3d.V3(scale, scale, scale)).Mul(math3d.Translate(center.Scale(-1)))
 		mesh.Transform(transform)
 	}
-
-	// Context for clean shutdown
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
-	go func() {
-		<-sigChan
-		cancel()
-	}()
-
 	// Input state
 	inputTorque := struct{ pitch, yaw, roll float64 }{}
 	const torqueStrength = 3.0
@@ -476,13 +464,21 @@ func run(modelPath string) (err error) {
 	targetDuration := time.Second / time.Duration(targetFPS)
 	lastFrame := time.Now()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		default:
+	ap.OnMouse = func() {
+		if !viewState.LightMode {
+			return
 		}
+		// Convert screen coordinates to light direction
+		viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, termWidth, termHeight)
 
+		// Check for mouse click to confirm light position
+		if ap.MouseRelease() {
+			viewState.LightDir = viewState.PendingLight
+			viewState.LightMode = false
+		}
+	}
+
+	for {
 		now := time.Now()
 		dt := now.Sub(lastFrame).Seconds()
 		lastFrame = now
@@ -496,7 +492,6 @@ func run(modelPath string) (err error) {
 		if err != nil {
 			return fmt.Errorf("input error: %w", err)
 		}
-
 		// Process keyboard input from ap.Data
 		if len(ap.Data) > 0 {
 			for _, b := range ap.Data {
