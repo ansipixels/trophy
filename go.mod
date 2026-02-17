@@ -4,13 +4,13 @@ go 1.24.0
 
 require (
 	fortio.org/cli v1.12.3
+	fortio.org/log v1.18.3
 	fortio.org/terminal v0.64.1
 	github.com/charmbracelet/harmonica v0.2.0
 	github.com/qmuntal/gltf v0.28.0
 )
 
 require (
-	fortio.org/log v1.18.3 // indirect
 	fortio.org/safecast v1.2.0 // indirect
 	fortio.org/struct2env v0.4.2 // indirect
 	fortio.org/version v1.0.4 // indirect
