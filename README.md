@@ -33,9 +33,11 @@ Or on mac
 brew install ansipixels/tap/trophy
 ```
 
-Or even
+Or even with docker (slower than native though)
 ```sh
-docker run -v `pwd`:/data -ti ghcr.io/ansipixels/trophy docs/trophy.glb
+docker run -ti ghcr.io/ansipixels/trophy # default Trophy model demo
+# Or
+docker run -v `pwd`:/data -ti ghcr.io/ansipixels/trophy ./yourmodel.glb
 ```
 
 ## Usage
