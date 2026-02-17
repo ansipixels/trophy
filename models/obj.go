@@ -38,6 +38,8 @@ func (l *OBJLoader) LoadFile(path string) (*Mesh, error) {
 }
 
 // Load parses an OBJ from a reader.
+//
+//nolint:gocognit,gocyclo,funlen // inherited code.
 func (l *OBJLoader) Load(r io.Reader, name string) (*Mesh, error) {
 	mesh := NewMesh(name)
 

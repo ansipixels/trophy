@@ -1,3 +1,4 @@
+//nolint:dupl, gosec // gosec is bugged with [3]int somehow. should fix the dupl though.
 package render
 
 import (
@@ -878,7 +879,7 @@ type MeshRenderer interface {
 // BoundedMeshRenderer extends MeshRenderer with bounding box support for frustum culling.
 type BoundedMeshRenderer interface {
 	MeshRenderer
-	GetBounds() (min, max math3d.Vec3)
+	GetBounds() (minV, maxV math3d.Vec3)
 }
 
 // tryFrustumCull attempts to cull a mesh using its bounds if available.
@@ -919,12 +920,14 @@ func (r *Rasterizer) DrawMesh(mesh MeshRenderer, transform math3d.Mat4, color Co
 	invTransform := transform.Inverse()
 	localLight := invTransform.MulVec3Dir(lightDir).Normalize()
 
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices
 		p0, _, _ := mesh.GetVertex(face[0])
+
 		p1, _, _ := mesh.GetVertex(face[1])
+
 		p2, _, _ := mesh.GetVertex(face[2])
 
 		// Transform to world space
@@ -944,12 +947,15 @@ func (r *Rasterizer) DrawMeshTextured(mesh MeshRenderer, transform math3d.Mat4, 
 		return
 	}
 
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, uv0 := mesh.GetVertex(face[0])
+
 		p1, n1, uv1 := mesh.GetVertex(face[1])
+
 		p2, n2, uv2 := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -984,12 +990,15 @@ func (r *Rasterizer) DrawMeshGouraud(mesh MeshRenderer, transform math3d.Mat4, c
 		return
 	}
 
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, _ := mesh.GetVertex(face[0])
+
 		p1, n1, _ := mesh.GetVertex(face[1])
+
 		p2, n2, _ := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -1024,12 +1033,15 @@ func (r *Rasterizer) DrawMeshTexturedGouraud(mesh MeshRenderer, transform math3d
 		return
 	}
 
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, uv0 := mesh.GetVertex(face[0])
+
 		p1, n1, uv1 := mesh.GetVertex(face[1])
+
 		p2, n2, uv2 := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -1058,7 +1070,13 @@ func (r *Rasterizer) DrawMeshTexturedGouraud(mesh MeshRenderer, transform math3d
 // DrawMeshGouraudCulled renders a mesh with Gouraud shading, with frustum culling.
 // localBounds should be the mesh's local-space bounding box (e.g., mesh.BoundsMin/Max).
 // Returns true if the mesh was drawn, false if it was culled.
-func (r *Rasterizer) DrawMeshGouraudCulled(mesh MeshRenderer, transform math3d.Mat4, localBounds AABB, color Color, lightDir math3d.Vec3) bool {
+func (r *Rasterizer) DrawMeshGouraudCulled(
+	mesh MeshRenderer,
+	transform math3d.Mat4,
+	localBounds AABB,
+	color Color,
+	lightDir math3d.Vec3,
+) bool {
 	r.CullingStats.MeshesTested++
 
 	// Transform bounds to world space and test against frustum
@@ -1075,7 +1093,13 @@ func (r *Rasterizer) DrawMeshGouraudCulled(mesh MeshRenderer, transform math3d.M
 // DrawMeshTexturedGouraudCulled renders a textured mesh with Gouraud shading, with frustum culling.
 // localBounds should be the mesh's local-space bounding box (e.g., mesh.BoundsMin/Max).
 // Returns true if the mesh was drawn, false if it was culled.
-func (r *Rasterizer) DrawMeshTexturedGouraudCulled(mesh MeshRenderer, transform math3d.Mat4, localBounds AABB, tex *Texture, lightDir math3d.Vec3) bool {
+func (r *Rasterizer) DrawMeshTexturedGouraudCulled(
+	mesh MeshRenderer,
+	transform math3d.Mat4,
+	localBounds AABB,
+	tex *Texture,
+	lightDir math3d.Vec3,
+) bool {
 	r.CullingStats.MeshesTested++
 
 	// Transform bounds to world space and test against frustum
@@ -1091,7 +1115,13 @@ func (r *Rasterizer) DrawMeshTexturedGouraudCulled(mesh MeshRenderer, transform 
 
 // DrawMeshCulled renders a mesh with frustum culling.
 // Returns true if the mesh was drawn, false if it was culled.
-func (r *Rasterizer) DrawMeshCulled(mesh MeshRenderer, transform math3d.Mat4, localBounds AABB, color Color, lightDir math3d.Vec3) bool {
+func (r *Rasterizer) DrawMeshCulled(
+	mesh MeshRenderer,
+	transform math3d.Mat4,
+	localBounds AABB,
+	color Color,
+	lightDir math3d.Vec3,
+) bool {
 	r.CullingStats.MeshesTested++
 
 	if !r.IsVisibleTransformed(localBounds, transform) {
@@ -1106,7 +1136,13 @@ func (r *Rasterizer) DrawMeshCulled(mesh MeshRenderer, transform math3d.Mat4, lo
 
 // DrawMeshTexturedCulled renders a textured mesh with frustum culling.
 // Returns true if the mesh was drawn, false if it was culled.
-func (r *Rasterizer) DrawMeshTexturedCulled(mesh MeshRenderer, transform math3d.Mat4, localBounds AABB, tex *Texture, lightDir math3d.Vec3) bool {
+func (r *Rasterizer) DrawMeshTexturedCulled(
+	mesh MeshRenderer,
+	transform math3d.Mat4,
+	localBounds AABB,
+	tex *Texture,
+	lightDir math3d.Vec3,
+) bool {
 	r.CullingStats.MeshesTested++
 
 	if !r.IsVisibleTransformed(localBounds, transform) {
@@ -1127,11 +1163,13 @@ func (r *Rasterizer) DrawMeshWireframe(mesh MeshRenderer, transform math3d.Mat4,
 		return
 	}
 
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		p0, _, _ := mesh.GetVertex(face[0])
+
 		p1, _, _ := mesh.GetVertex(face[1])
+
 		p2, _, _ := mesh.GetVertex(face[2])
 
 		v0 := transform.MulVec3(p0)

@@ -71,6 +71,7 @@ func LoadTexture(path string) (*Texture, error) {
 			c := img.At(bounds.Min.X+x, bounds.Min.Y+y)
 			r, g, b, a := c.RGBA()
 			// RGBA returns 16-bit values, scale to 8-bit
+			//nolint:gosec // G115: bit-shifted 16-bit values safe to convert to uint8
 			tex.SetPixel(x, y, Color{
 				R: uint8(r >> 8),
 				G: uint8(g >> 8),
@@ -96,6 +97,7 @@ func TextureFromImage(img image.Image) *Texture {
 			c := img.At(bounds.Min.X+x, bounds.Min.Y+y)
 			r, g, b, a := c.RGBA()
 			// RGBA returns 16-bit values, scale to 8-bit
+			//nolint:gosec // G115: bit-shifted 16-bit values safe to convert to uint8
 			tex.SetPixel(x, y, Color{
 				R: uint8(r >> 8),
 				G: uint8(g >> 8),
@@ -174,7 +176,7 @@ func (t *Texture) Sample(u, v float64) Color {
 func (t *Texture) wrapCoord(coord float64, mode WrapMode) float64 {
 	switch mode {
 	case WrapRepeat:
-		coord = coord - math.Floor(coord) // fmod to [0,1)
+		coord -= math.Floor(coord) // fmod to [0,1)
 	case WrapClamp:
 		coord = math.Max(0, math.Min(1, coord))
 	}
@@ -234,7 +236,7 @@ func (t *Texture) sampleBilinear(u, v float64) Color {
 func (t *Texture) wrapPixelCoord(x, size int, mode WrapMode) int {
 	switch mode {
 	case WrapRepeat:
-		x = x % size
+		x %= size
 		if x < 0 {
 			x += size
 		}
@@ -270,6 +272,7 @@ func MultiplyColor(c Color, intensity float64) Color {
 
 // ModulateColor modulates one color by another (texture * vertex color).
 func ModulateColor(a, b Color) Color {
+	//nolint:gosec // G115: multiplication of uint8 values safe, result scaled to 0-255 range
 	return Color{
 		R: uint8((int(a.R) * int(b.R)) / 255),
 		G: uint8((int(a.G) * int(b.G)) / 255),

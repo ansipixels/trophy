@@ -199,7 +199,7 @@ func (m *Mesh) MaterialCount() int {
 
 // GetBounds returns the axis-aligned bounding box.
 // Implements render.BoundedMeshRenderer interface.
-func (m *Mesh) GetBounds() (min, max math3d.Vec3) {
+func (m *Mesh) GetBounds() (minV, maxV math3d.Vec3) {
 	return m.BoundsMin, m.BoundsMax
 }
 

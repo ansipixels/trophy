@@ -1,3 +1,4 @@
+//nolint:nestif // inherited code.
 package models
 
 import (
@@ -5,10 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	_ "image/jpeg"
-	_ "image/png"
+	_ "image/jpeg" // for decoding JPEG images in GLTF files
+	_ "image/png"  // for decoding PNG images in GLTF files
 	"os"
 	"path/filepath"
+	"slices"
 	"unsafe"
 
 	"github.com/ansipixels/trophy/math3d"
@@ -54,22 +56,19 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 	if len(doc.Scenes) > 0 {
 		sceneIdx := 0
 		if doc.Scene != nil {
-			sceneIdx = int(*doc.Scene)
+			sceneIdx = *doc.Scene
 		}
 		scene := doc.Scenes[sceneIdx]
 		for _, nodeIdx := range scene.Nodes {
-			l.processNode(doc, int(nodeIdx), math3d.Identity(), mesh, processedMeshes)
+			l.processNode(doc, nodeIdx, math3d.Identity(), mesh, processedMeshes)
 		}
 	} else {
 		// No scenes defined, process all root nodes
 		for i := range doc.Nodes {
 			isRoot := true
 			for _, n := range doc.Nodes {
-				for _, child := range n.Children {
-					if int(child) == i {
-						isRoot = false
-						break
-					}
+				if slices.Contains(n.Children, i) {
+					isRoot = false
 				}
 				if !isRoot {
 					break
@@ -104,7 +103,13 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 }
 
 // processNode recursively processes a node and its children, accumulating transforms.
-func (l *GLTFLoader) processNode(doc *gltf.Document, nodeIdx int, parentTransform math3d.Mat4, mesh *Mesh, processedMeshes map[int]bool) {
+func (l *GLTFLoader) processNode(
+	doc *gltf.Document,
+	nodeIdx int,
+	parentTransform math3d.Mat4,
+	mesh *Mesh,
+	processedMeshes map[int]bool,
+) {
 	node := doc.Nodes[nodeIdx]
 
 	// Build this node's local transform
@@ -142,14 +147,14 @@ func (l *GLTFLoader) processNode(doc *gltf.Document, nodeIdx int, parentTransfor
 	worldTransform := parentTransform.Mul(localTransform)
 
 	if node.Mesh != nil {
-		meshIdx := int(*node.Mesh)
+		meshIdx := *node.Mesh
 		gltfMesh := doc.Meshes[meshIdx]
-		l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform)
+		_ = l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform)
 		processedMeshes[meshIdx] = true
 	}
 
 	for _, childIdx := range node.Children {
-		l.processNode(doc, int(childIdx), worldTransform, mesh, processedMeshes)
+		l.processNode(doc, childIdx, worldTransform, mesh, processedMeshes)
 	}
 }
 
@@ -188,7 +193,7 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 
 		materialIdx := -1
 		if prim.Material != nil {
-			materialIdx = int(*prim.Material)
+			materialIdx = *prim.Material
 		}
 
 		baseVertex := len(mesh.Vertices)
@@ -242,106 +247,6 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 	return nil
 }
 
-// processMesh extracts geometry from a GLTF mesh.
-func (l *GLTFLoader) processMesh(doc *gltf.Document, m *gltf.Mesh, mesh *Mesh) error {
-	for _, prim := range m.Primitives {
-		if prim.Mode != gltf.PrimitiveTriangles && prim.Mode != 0 {
-			// Skip non-triangle primitives (lines, points, etc)
-			continue
-		}
-
-		// Get position accessor
-		posIdx, ok := prim.Attributes[gltf.POSITION]
-		if !ok {
-			continue
-		}
-
-		positions, err := readVec3Accessor(doc, posIdx)
-		if err != nil {
-			return fmt.Errorf("read positions: %w", err)
-		}
-
-		// Get normals if available
-		var normals []math3d.Vec3
-		if normIdx, ok := prim.Attributes[gltf.NORMAL]; ok {
-			normals, err = readVec3Accessor(doc, normIdx)
-			if err != nil {
-				return fmt.Errorf("read normals: %w", err)
-			}
-		}
-
-		// Get UVs if available
-		var uvs []math3d.Vec2
-		if uvIdx, ok := prim.Attributes[gltf.TEXCOORD_0]; ok {
-			uvs, err = readVec2Accessor(doc, uvIdx)
-			if err != nil {
-				return fmt.Errorf("read uvs: %w", err)
-			}
-		}
-
-		// Base vertex index for this primitive
-		baseVertex := len(mesh.Vertices)
-
-		// Add vertices
-		for i := range positions {
-			v := MeshVertex{
-				Position: positions[i],
-			}
-			if i < len(normals) {
-				v.Normal = normals[i]
-			}
-			if i < len(uvs) {
-				// GLTF uses top-left origin (V=0 at top), flip V for bottom-left origin
-				v.UV = math3d.V2(uvs[i].X, 1.0-uvs[i].Y)
-			}
-			mesh.Vertices = append(mesh.Vertices, v)
-		}
-
-		// Get material index for this primitive
-		materialIdx := -1
-		if prim.Material != nil {
-			materialIdx = int(*prim.Material)
-		}
-
-		// Process indices
-		if prim.Indices != nil {
-			indices, err := readIndices(doc, *prim.Indices)
-			if err != nil {
-				return fmt.Errorf("read indices: %w", err)
-			}
-
-			// Create faces from indices
-			// Note: GLTF uses CCW winding for front-facing, but our engine uses CW
-			// (due to Y-flip in screen space), so we reverse the winding here
-			for i := 0; i+2 < len(indices); i += 3 {
-				mesh.Faces = append(mesh.Faces, Face{
-					V: [3]int{
-						baseVertex + indices[i],
-						baseVertex + indices[i+2], // swapped
-						baseVertex + indices[i+1], // swapped
-					},
-					Material: materialIdx,
-				})
-			}
-		} else {
-			// No indices, assume sequential triangles
-			// Also reverse winding: CCW -> CW
-			for i := 0; i+2 < len(positions); i += 3 {
-				mesh.Faces = append(mesh.Faces, Face{
-					V: [3]int{
-						baseVertex + i,
-						baseVertex + i + 2, // swapped
-						baseVertex + i + 1, // swapped
-					},
-					Material: materialIdx,
-				})
-			}
-		}
-	}
-
-	return nil
-}
-
 // extractMaterials extracts all materials from a GLTF document.
 func extractMaterials(doc *gltf.Document, basePath string) []Material {
 	materials := make([]Material, len(doc.Materials))
@@ -378,9 +283,9 @@ func extractMaterials(doc *gltf.Document, basePath string) []Material {
 			// Extract base color texture if present
 			if pbr.BaseColorTexture != nil {
 				texIdx := pbr.BaseColorTexture.Index
-				if int(texIdx) < len(doc.Textures) {
+				if texIdx < len(doc.Textures) {
 					tex := doc.Textures[texIdx]
-					if tex.Source != nil && int(*tex.Source) < len(doc.Images) {
+					if tex.Source != nil && *tex.Source < len(doc.Images) {
 						img := doc.Images[*tex.Source]
 						texImg := loadGLTFImage(doc, img, basePath)
 						if texImg != nil {
@@ -539,6 +444,7 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 	count := accessor.Count
 
 	// Read based on component type and accessor type
+	//nolint:exhaustive // handles common types, error returned for unsupported ones
 	switch accessor.Type {
 	case gltf.AccessorVec3:
 		if stride == 0 {
@@ -568,6 +474,7 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 
 	case gltf.AccessorScalar:
 		if stride == 0 {
+			//nolint:exhaustive // handles common types
 			switch accessor.ComponentType {
 			case gltf.ComponentUbyte:
 				stride = 1
@@ -578,6 +485,7 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 			}
 		}
 
+		//nolint:exhaustive // handles common types, error returned for unsupported ones
 		switch accessor.ComponentType {
 		case gltf.ComponentUbyte:
 			result := make([]uint8, count)

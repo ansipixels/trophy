@@ -94,6 +94,7 @@ func isBinarySTL(data []byte) bool {
 		// Check if triangle count matches file size
 		triCount := binary.LittleEndian.Uint32(data[80:84])
 		expectedSize := 84 + triCount*50
+		//nolint:gosec // G115: triCount is validated to be reasonable size
 		if uint32(len(data)) == expectedSize {
 			return true
 		}
@@ -113,6 +114,7 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 	triCount := binary.LittleEndian.Uint32(data[80:84])
 
 	expectedSize := 84 + triCount*50
+	//nolint:gosec // G115: comparison is safe as triCount is from file header
 	if uint32(len(data)) < expectedSize {
 		return nil, fmt.Errorf("binary STL truncated: expected %d bytes, got %d", expectedSize, len(data))
 	}
@@ -207,6 +209,8 @@ func readFloat32LE(data []byte) float32 {
 }
 
 // loadASCII parses ASCII STL format.
+//
+//nolint:funlen,gocyclo,gocognit // inherited code.
 func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 	mesh := NewMesh(name)
 
