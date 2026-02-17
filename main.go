@@ -359,19 +359,12 @@ func run(modelPath string) int {
 		}
 	}
 
-	for {
-		now := time.Now()
+	now := time.Now()
+	err = ap.FPSTicks(func() bool {
 		dt := now.Sub(lastFrame).Seconds()
 		lastFrame = now
-
 		if dt > 0.1 {
 			dt = 0.1
-		}
-
-		// Read input
-		_, err := ap.ReadOrResizeOrSignalOnce()
-		if err != nil {
-			return log.FErrf("input error: %w", err)
 		}
 		// Process keyboard input from ap.Data
 		if len(ap.Data) > 0 {
@@ -428,8 +421,10 @@ func run(modelPath string) int {
 					if viewState.LightMode {
 						viewState.LightMode = false
 					} else {
-						return 0
+						return false
 					}
+				case 3, 4: // Ctrl-C, Ctrl-D
+					return false
 				}
 			}
 		}
@@ -486,15 +481,18 @@ func run(modelPath string) int {
 		img := fb.ToImage()
 
 		// Display using ansipixels
-		ap.StartSyncMode()
 		ap.ClearScreen()
 		if err := ap.ShowScaledImage(img); err != nil {
-			return log.FErrf("show image: %w", err)
+			log.Errf("show image: %v", err)
+			return false
 		}
-
 		// HUD overlay
 		hud.UpdateFPS()
 		hud.Draw(ap)
-		ap.EndSyncMode()
+		return true // continue running
+	})
+	if err != nil {
+		return log.FErrf("main loop: %v", err)
 	}
+	return 0
 }
