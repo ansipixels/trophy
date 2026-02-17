@@ -10,6 +10,7 @@ import (
 	_ "image/png"  // for decoding PNG images in GLTF files
 	"os"
 	"path/filepath"
+	"slices"
 	"unsafe"
 
 	"github.com/ansipixels/trophy/math3d"
@@ -66,11 +67,8 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 		for i := range doc.Nodes {
 			isRoot := true
 			for _, n := range doc.Nodes {
-				for _, child := range n.Children {
-					if child == i {
-						isRoot = false
-						break
-					}
+				if slices.Contains(n.Children, i) {
+					isRoot = false
 				}
 				if !isRoot {
 					break

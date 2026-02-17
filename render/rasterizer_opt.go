@@ -1,7 +1,7 @@
 // Package render provides optimized software asterization routines using edge function rasterization.
 // Uses incremental updates to avoid recomputing barycentric coordinates per pixel.
 //
-//nolint:dupl,funlen // TODO dupl one to be fixed but this is inherited code.
+//nolint:dupl,funlen,gosec // TODO dupl one to be fixed but this is inherited code.
 package render
 
 import (
@@ -177,12 +177,13 @@ func (r *Rasterizer) DrawMeshGouraudOpt(mesh MeshRenderer, transform math3d.Mat4
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		p0, n0, _ := mesh.GetVertex(face[0])
+
 		p1, n1, _ := mesh.GetVertex(face[1])
+
 		p2, n2, _ := mesh.GetVertex(face[2])
 
 		v0 := transform.MulVec3(p0)
@@ -346,12 +347,13 @@ func (r *Rasterizer) DrawMeshTexturedOpt(mesh MeshRenderer, transform math3d.Mat
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		p0, n0, uv0 := mesh.GetVertex(face[0])
+
 		p1, n1, uv1 := mesh.GetVertex(face[1])
+
 		p2, n2, uv2 := mesh.GetVertex(face[2])
 
 		v0 := transform.MulVec3(p0)

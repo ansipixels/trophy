@@ -1,4 +1,4 @@
-//nolint:dupl // TODO to be fixed but this is inherited code.
+//nolint:dupl, gosec // gosec is bugged with [3]int somehow. should fix the dupl though.
 package render
 
 import (
@@ -223,7 +223,7 @@ func (r *Rasterizer) DrawTriangle(tri Triangle) {
 			}
 
 			// Interpolate depth (perspective-correct)
-			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z //nolint:gosec // gosec bug: slice has 3 elements
+			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z
 
 			// Z-buffer test
 			if z >= r.getDepth(x, y) {
@@ -330,7 +330,7 @@ func (r *Rasterizer) DrawTriangleTextured(tri Triangle, tex *Texture, lightDir m
 			}
 
 			// Interpolate depth
-			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z //nolint:gosec // gosec bug: slice has 3 elements
+			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z
 
 			// Z-buffer test
 			if z >= r.getDepth(x, y) {
@@ -833,7 +833,7 @@ func (r *Rasterizer) DrawTriangleTexturedGouraud(tri Triangle, tex *Texture, lig
 			}
 
 			// Interpolate depth
-			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z //nolint:gosec // gosec bug: slice has 3 elements
+			z := bc.X*sv[0].Z + bc.Y*sv[1].Z + bc.Z*sv[2].Z
 
 			// Z-buffer test
 			if z >= r.getDepth(x, y) {
@@ -920,13 +920,14 @@ func (r *Rasterizer) DrawMesh(mesh MeshRenderer, transform math3d.Mat4, color Co
 	invTransform := transform.Inverse()
 	localLight := invTransform.MulVec3Dir(lightDir).Normalize()
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices
 		p0, _, _ := mesh.GetVertex(face[0])
+
 		p1, _, _ := mesh.GetVertex(face[1])
+
 		p2, _, _ := mesh.GetVertex(face[2])
 
 		// Transform to world space
@@ -946,13 +947,15 @@ func (r *Rasterizer) DrawMeshTextured(mesh MeshRenderer, transform math3d.Mat4, 
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, uv0 := mesh.GetVertex(face[0])
+
 		p1, n1, uv1 := mesh.GetVertex(face[1])
+
 		p2, n2, uv2 := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -987,13 +990,15 @@ func (r *Rasterizer) DrawMeshGouraud(mesh MeshRenderer, transform math3d.Mat4, c
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, _ := mesh.GetVertex(face[0])
+
 		p1, n1, _ := mesh.GetVertex(face[1])
+
 		p2, n2, _ := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -1028,13 +1033,15 @@ func (r *Rasterizer) DrawMeshTexturedGouraud(mesh MeshRenderer, transform math3d
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		// Get vertices with all attributes
+
 		p0, n0, uv0 := mesh.GetVertex(face[0])
+
 		p1, n1, uv1 := mesh.GetVertex(face[1])
+
 		p2, n2, uv2 := mesh.GetVertex(face[2])
 
 		// Transform positions to world space
@@ -1156,12 +1163,13 @@ func (r *Rasterizer) DrawMeshWireframe(mesh MeshRenderer, transform math3d.Mat4,
 		return
 	}
 
-	//nolint:intrange // TriangleCount() may have side effects
-	for i := 0; i < mesh.TriangleCount(); i++ {
+	for i := range mesh.TriangleCount() {
 		face := mesh.GetFace(i)
 
 		p0, _, _ := mesh.GetVertex(face[0])
+
 		p1, _, _ := mesh.GetVertex(face[1])
+
 		p2, _, _ := mesh.GetVertex(face[2])
 
 		v0 := transform.MulVec3(p0)
