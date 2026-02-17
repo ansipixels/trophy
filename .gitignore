@@ -1,18 +1,21 @@
-# Binaries
-/trophy
-/cmd/trophy/trophy
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-.crush/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Test
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 *.test
-coverage.out
+*.out
+.history
+# Go workspace file
+go.work
+go.work.sum
+# Workflow/build related:
+.goreleaser.yaml
+trophy
+# Other grol/fortio/...
+.gr
+*.pprof
+*.json
+.golangci.yml
+# macos
+.DS_Store
