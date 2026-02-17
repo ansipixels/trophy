@@ -1,4 +1,3 @@
-// Package render provides software rasterization tests for Trophy.
 package render
 
 import (
@@ -125,8 +124,8 @@ func TestDrawTriangleGouraud_VertexLighting(t *testing.T) {
 
 	// Check that the triangle was drawn (some pixels should be non-black)
 	hasPixels := false
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				hasPixels = true
@@ -165,8 +164,8 @@ func TestDrawTriangleGouraud_SmoothShading(t *testing.T) {
 
 	// Count drawn pixels
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -212,8 +211,8 @@ func TestDrawMeshGouraud(t *testing.T) {
 
 	// Verify mesh was rendered
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -319,8 +318,8 @@ func TestDrawTriangleGouraud_BackfaceCulling(t *testing.T) {
 
 	// Back-facing triangle should not be drawn
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -347,8 +346,8 @@ func TestDrawTransformedCubeGouraud(t *testing.T) {
 
 	// Verify cube was rendered
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -388,8 +387,8 @@ func TestDrawTriangleTexturedGouraud(t *testing.T) {
 
 	// Verify textured triangle was rendered
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -445,8 +444,8 @@ func TestDrawMeshTexturedGouraud(t *testing.T) {
 
 	// Verify mesh was rendered with texture
 	pixelCount := 0
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			c := fb.GetPixel(x, y)
 			if c.R > 0 || c.G > 0 || c.B > 0 {
 				pixelCount++
@@ -500,7 +499,7 @@ func TestRasterizerDepthBoundsCheck(t *testing.T) {
 	r.setDepth(100, 0, 1.0)
 }
 
-// Helper function for color comparison tolerance
+// Helper function for color comparison tolerance.
 func absInt(x int) int {
 	if x < 0 {
 		return -x
@@ -508,7 +507,7 @@ func absInt(x int) int {
 	return x
 }
 
-// Benchmark tests
+// Benchmark tests.
 func BenchmarkDrawTriangleGouraud(b *testing.B) {
 	r, _ := createTestRasterizer(200, 200)
 
@@ -651,14 +650,14 @@ func BenchmarkGouraudComparison(b *testing.B) {
 	lightDir := math3d.V3(0, 0, 1)
 
 	b.Run("original", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			r.ClearDepth()
 			r.DrawTriangleGouraud(tri, lightDir)
 		}
 	})
 
 	b.Run("optimized", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			r.ClearDepth()
 			r.DrawTriangleGouraudOpt(tri, lightDir)
 		}

@@ -1,4 +1,3 @@
-// Package render provides software rasterization for Trophy.
 package render
 
 import (
@@ -14,12 +13,12 @@ type Plane struct {
 
 // Normalize normalizes the plane equation so the normal has unit length.
 func (p *Plane) Normalize() {
-	len := p.Normal.Len()
-	if len == 0 {
+	length := p.Normal.Len()
+	if length == 0 {
 		return
 	}
-	p.Normal = p.Normal.Scale(1.0 / len)
-	p.D /= len
+	p.Normal = p.Normal.Scale(1.0 / length)
+	p.D /= length
 }
 
 // DistanceToPoint returns the signed distance from the plane to a point.

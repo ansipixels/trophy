@@ -1,4 +1,4 @@
-// Package render provides optimized rasterization routines using edge function rasterization.
+// Package render provides optimized software asterization routines using edge function rasterization.
 // Uses incremental updates to avoid recomputing barycentric coordinates per pixel.
 package render
 
@@ -10,7 +10,7 @@ import (
 
 // edgeFunction computes the signed area of the parallelogram formed by vertices.
 // Positive = left of edge, negative = right of edge, zero = on edge.
-// Returns A, B, C coefficients for: edge(x,y) = A*x + B*y + C
+// Returns A, B, C coefficients for: edge(x,y) = A*x + B*y + C.
 func edgeCoeffs(x0, y0, x1, y1 float64) (A, B, C float64) {
 	A = y0 - y1 // dy
 	B = x1 - x0 // -dx
@@ -18,7 +18,7 @@ func edgeCoeffs(x0, y0, x1, y1 float64) (A, B, C float64) {
 	return
 }
 
-// edgeFunc evaluates edge function at point (x, y)
+// edgeFunc evaluates edge function at point (x, y).
 func edgeFunc(A, B, C, x, y float64) float64 {
 	return A*x + B*y + C
 }

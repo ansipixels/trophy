@@ -1,8 +1,15 @@
+[![Go Reference](https://pkg.go.dev/badge/github.com/ansipixels/trophy.svg)](https://pkg.go.dev/github.com/ansipixels/trophy)
+[![Go Report Card](https://goreportcard.com/badge/github.com/ansipixels/trophy)](https://goreportcard.com/report/github.com/ansipixels/trophy)
+[![GitHub Release](https://img.shields.io/github/release/ansipixels/trophy.svg?style=flat)](https://github.com/ansipixels/trophy/releases/)
+[![CI Checks](https://github.com/ansipixels/trophy/actions/workflows/include.yml/badge.svg)](https://github.com/ansipixels/trophy/actions/workflows/include.yml)
+[![codecov](https://codecov.io/github/ansipixels/trophy/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/github/ansipixels/trophy)
+
+
 # Trophy 🏆
 
 Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your terminal.
 
-![Trophy Demo](docs/demo.gif)
+![Trophy Demo](docs/trophy.gif)
 
 ## Features
 
@@ -14,8 +21,21 @@ Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your termina
 
 ## Installation
 
+See the [binary releases](releases/) or
+
+From source/with go:
 ```bash
 go install github.com/ansipixels/trophy@latest
+```
+
+Or on mac
+```
+brew install ansipixels/tap/trophy
+```
+
+Or even
+```sh
+docker run -ti ghcr.io/ansipixels/trophy # but that's obviously slower
 ```
 
 ## Usage

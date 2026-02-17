@@ -114,7 +114,7 @@ func TestQuatToMat4Identity(t *testing.T) {
 	m := math3d.QuatToMat4(0, 0, 0, 1)
 	identity := math3d.Identity()
 
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		if math.Abs(m[i]-identity[i]) > 1e-10 {
 			t.Errorf("QuatToMat4 identity mismatch at index %d: got %f, want %f", i, m[i], identity[i])
 		}
@@ -126,7 +126,7 @@ func TestMat4FromSlice(t *testing.T) {
 	slice := []float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	m := math3d.Mat4FromSlice(slice)
 
-	for i := 0; i < 16; i++ {
+	for i := range 16 {
 		if m[i] != slice[i] {
 			t.Errorf("Mat4FromSlice mismatch at index %d: got %f, want %f", i, m[i], slice[i])
 		}
