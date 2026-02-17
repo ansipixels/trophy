@@ -2,6 +2,7 @@ package models
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -440,7 +441,7 @@ func readVec3Accessor(doc *gltf.Document, accessorIdx int) ([]math3d.Vec3, error
 
 	floats, ok := data.([][3]float32)
 	if !ok {
-		return nil, fmt.Errorf("unexpected data type for VEC3")
+		return nil, errors.New("unexpected data type for VEC3")
 	}
 
 	result := make([]math3d.Vec3, len(floats))
@@ -465,7 +466,7 @@ func readVec2Accessor(doc *gltf.Document, accessorIdx int) ([]math3d.Vec2, error
 
 	floats, ok := data.([][2]float32)
 	if !ok {
-		return nil, fmt.Errorf("unexpected data type for VEC2")
+		return nil, errors.New("unexpected data type for VEC2")
 	}
 
 	result := make([]math3d.Vec2, len(floats))
@@ -512,7 +513,7 @@ func readIndices(doc *gltf.Document, accessorIdx int) ([]int, error) {
 // readAccessorData reads raw data from a GLTF accessor.
 func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) {
 	if accessor.BufferView == nil {
-		return nil, fmt.Errorf("accessor has no buffer view")
+		return nil, errors.New("accessor has no buffer view")
 	}
 
 	bufferView := doc.BufferViews[*accessor.BufferView]
@@ -525,11 +526,11 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 		bufData = buffer.Data
 	} else {
 		// External file - need to load relative to document
-		return nil, fmt.Errorf("external buffers not supported yet")
+		return nil, errors.New("external buffers not supported yet")
 	}
 
 	if bufData == nil {
-		return nil, fmt.Errorf("buffer has no data")
+		return nil, errors.New("buffer has no data")
 	}
 
 	// Calculate data bounds

@@ -1,4 +1,3 @@
-// Package render provides terminal rendering capabilities for Trophy.
 package render
 
 import (
@@ -121,8 +120,8 @@ func abs(x int) int {
 // ToImage converts the framebuffer to a standard Go image.RGBA.
 func (fb *Framebuffer) ToImage() *image.RGBA {
 	img := image.NewRGBA(image.Rect(0, 0, fb.Width, fb.Height))
-	for y := 0; y < fb.Height; y++ {
-		for x := 0; x < fb.Width; x++ {
+	for y := range fb.Height {
+		for x := range fb.Width {
 			img.SetRGBA(x, y, fb.Pixels[y*fb.Width+x])
 		}
 	}

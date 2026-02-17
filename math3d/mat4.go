@@ -15,7 +15,7 @@ import "math"
 // | Xx Yx Zx Tx |   X,Y,Z = basis vectors (rotation/scale)
 // | Xy Yy Zy Ty |   T = translation
 // | Xz Yz Zz Tz |
-// | 0  0  0  1  |
+// | 0  0  0  1  |.
 type Mat4 [16]float64
 
 // Identity returns the identity matrix.

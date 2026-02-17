@@ -204,7 +204,7 @@ func (l *OBJLoader) Load(r io.Reader, name string) (*Mesh, error) {
 }
 
 // parseFaceVertex parses a face vertex in format: v, v/vt, v/vt/vn, or v//vn
-// Returns 1-indexed values (0 means not specified)
+// Returns 1-indexed values (0 means not specified).
 func parseFaceVertex(s string) (pos, uv, normal int, err error) {
 	parts := strings.Split(s, "/")
 

@@ -60,7 +60,7 @@ func main() {
 	os.Exit(run(modelPath))
 }
 
-// RotationAxis tracks position and velocity for one rotation axis with spring decay
+// RotationAxis tracks position and velocity for one rotation axis with spring decay.
 type RotationAxis struct {
 	Position  float64
 	Velocity  float64
@@ -68,7 +68,7 @@ type RotationAxis struct {
 	velAccel  float64 // internal spring velocity (for animating Velocity toward 0)
 }
 
-// NewRotationAxis creates an axis with harmonica spring for smooth velocity decay
+// NewRotationAxis creates an axis with harmonica spring for smooth velocity decay.
 func NewRotationAxis(fps int) RotationAxis {
 	return RotationAxis{
 		// Frequency 4.0 = moderate speed, damping 1.0 = critically damped (no overshoot)
@@ -76,7 +76,7 @@ func NewRotationAxis(fps int) RotationAxis {
 	}
 }
 
-// Update applies velocity to position and decays velocity toward 0 using spring
+// Update applies velocity to position and decays velocity toward 0 using spring.
 func (a *RotationAxis) Update(damping bool) {
 	// Apply velocity to position
 	a.Position += a.Velocity
@@ -87,7 +87,7 @@ func (a *RotationAxis) Update(damping bool) {
 	}
 }
 
-// RotationState holds rotation with harmonica spring physics
+// RotationState holds rotation with harmonica spring physics.
 type RotationState struct {
 	Pitch, Yaw, Roll RotationAxis
 	fps              int
@@ -120,7 +120,7 @@ func (r *RotationState) Reset() {
 	r.Roll = NewRotationAxis(r.fps)
 }
 
-// RenderMode controls how the mesh is drawn
+// RenderMode controls how the mesh is drawn.
 type RenderMode int
 
 const (
@@ -129,7 +129,7 @@ const (
 	RenderModeWireframe                   // Wireframe only
 )
 
-// ViewState holds all view-related settings (UI state, not library code)
+// ViewState holds all view-related settings (UI state, not library code).
 type ViewState struct {
 	TextureEnabled bool        // Whether to show textures
 	RenderMode     RenderMode  // Current render mode
@@ -141,7 +141,7 @@ type ViewState struct {
 	BackfaceCull   bool        // Whether to cull backfaces (true = cull, false = show both sides)
 }
 
-// NewViewState creates default view state
+// NewViewState creates default view state.
 func NewViewState() *ViewState {
 	return &ViewState{
 		TextureEnabled: true,
@@ -152,7 +152,7 @@ func NewViewState() *ViewState {
 	}
 }
 
-// HUD renders an overlay with model info and controls
+// HUD renders an overlay with model info and controls.
 type HUD struct {
 	filename  string
 	polyCount int
@@ -162,7 +162,7 @@ type HUD struct {
 	state     *ViewState
 }
 
-// NewHUD creates a new HUD
+// NewHUD creates a new HUD.
 func NewHUD(filename string, polyCount int, state *ViewState) *HUD {
 	return &HUD{
 		filename:  filename,
@@ -172,7 +172,7 @@ func NewHUD(filename string, polyCount int, state *ViewState) *HUD {
 	}
 }
 
-// UpdateFPS updates the FPS counter (call once per frame)
+// UpdateFPS updates the FPS counter (call once per frame).
 func (h *HUD) UpdateFPS() {
 	h.fpsFrames++
 	elapsed := time.Since(h.fpsTime)
@@ -183,7 +183,7 @@ func (h *HUD) UpdateFPS() {
 	}
 }
 
-// Draw renders the HUD overlay to the terminal using ansipixels
+// Draw renders the HUD overlay to the terminal using ansipixels.
 func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.LightMode {
 		// Light mode indicator
@@ -217,7 +217,7 @@ func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	ap.WriteAt(0, ap.H-1, "%s Texture  %s X-Ray (wireframe)", checkTex, checkWire)
 
 	// Bottom right: light hint
-	ap.WriteRight(ap.H-1, tcolor.Yellow.Foreground()+"L: position light"+tcolor.Reset)
+	ap.WriteRight(ap.H-1, "%sL: position light%s", tcolor.Yellow.Foreground(), tcolor.Reset)
 }
 
 // ScreenToLightDir converts a screen position to a light direction.

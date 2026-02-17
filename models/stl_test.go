@@ -223,7 +223,7 @@ endsolid test`
 	}
 }
 
-// TestSTLFaceIndicesValid ensures face indices point to valid vertices
+// TestSTLFaceIndicesValid ensures face indices point to valid vertices.
 func TestSTLFaceIndicesValid(t *testing.T) {
 	asciiSTL := `solid test
   facet normal 0 0 1
@@ -266,7 +266,7 @@ endsolid test`
 	}
 }
 
-// TestSTLNormalsNotZero ensures all vertices have non-zero normals
+// TestSTLNormalsNotZero ensures all vertices have non-zero normals.
 func TestSTLNormalsNotZero(t *testing.T) {
 	asciiSTL := `solid test
   facet normal 0.577 0.577 0.577
@@ -299,7 +299,7 @@ endsolid test`
 	}
 }
 
-// TestSTLWindingOrder tests that face winding matches GLTF/OBJ convention
+// TestSTLWindingOrder tests that face winding matches GLTF/OBJ convention.
 func TestSTLWindingOrder(t *testing.T) {
 	// Single triangle with known normal
 	asciiSTL := `solid test
@@ -344,7 +344,7 @@ endsolid test`
 	}
 }
 
-// TestSTLSharedVertexNormals tests that shared vertices get accumulated normals
+// TestSTLSharedVertexNormals tests that shared vertices get accumulated normals.
 func TestSTLSharedVertexNormals(t *testing.T) {
 	// Two triangles with SAME normal direction sharing vertex at (1,0,0)
 	// (using same-direction normals to avoid cancellation)
@@ -407,7 +407,7 @@ endsolid test`
 	}
 }
 
-// TestSTLTeapotLoad tests loading the actual teapot file
+// TestSTLTeapotLoad tests loading the actual teapot file.
 func TestSTLTeapotLoad(t *testing.T) {
 	loader := NewSTLLoader()
 	mesh, err := loader.LoadFile("../../docs/teapot.stl")
@@ -459,7 +459,7 @@ func TestSTLTeapotLoad(t *testing.T) {
 	t.Logf("Teapot: %d triangles, %d vertices", mesh.TriangleCount(), mesh.VertexCount())
 }
 
-// TestSTLNoDedupe tests loading without deduplication for comparison
+// TestSTLNoDedupe tests loading without deduplication for comparison.
 func TestSTLNoDedupe(t *testing.T) {
 	asciiSTL := `solid test
   facet normal 0 0 1
@@ -500,7 +500,7 @@ endsolid test`
 	}
 }
 
-// Helper to check if Vec3 has non-trivial length
+// Helper to check if Vec3 has non-trivial length.
 func vec3LenSq(v math3d.Vec3) float64 {
 	return v.X*v.X + v.Y*v.Y + v.Z*v.Z
 }

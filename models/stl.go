@@ -124,7 +124,7 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 	vertexMap := make(map[quantizedKey]int)
 
 	offset := 84
-	for i := uint32(0); i < triCount; i++ {
+	for range triCount {
 		// Read normal (3 floats = 12 bytes)
 		normal := math3d.V3(
 			float64(readFloat32LE(data[offset:])),
@@ -135,7 +135,7 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 
 		// Read 3 vertices (9 floats = 36 bytes)
 		var faceVerts [3]int
-		for v := 0; v < 3; v++ {
+		for v := range 3 {
 			pos := math3d.V3(
 				float64(readFloat32LE(data[offset:])),
 				float64(readFloat32LE(data[offset+4:])),

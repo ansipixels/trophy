@@ -1,4 +1,3 @@
-// Package render provides software rasterization for Trophy.
 package render
 
 import (

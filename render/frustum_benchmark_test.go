@@ -43,7 +43,7 @@ func BenchmarkAABBIntersection(b *testing.B) {
 	}
 
 	b.Run("visible", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = frustum.IntersectsFrustum(visibleBounds)
 		}
 	})
@@ -55,7 +55,7 @@ func BenchmarkAABBIntersection(b *testing.B) {
 	}
 
 	b.Run("culled", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			_ = frustum.IntersectsFrustum(culledBounds)
 		}
 	})
@@ -110,7 +110,7 @@ func BenchmarkCullingScenario(b *testing.B) {
 	}
 
 	b.Run("with_culling", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			visible := 0
 			for _, obj := range objects {
 				worldBounds := TransformAABB(obj.bounds, obj.transform)
@@ -124,7 +124,7 @@ func BenchmarkCullingScenario(b *testing.B) {
 
 	b.Run("no_culling", func(b *testing.B) {
 		// Simulate just doing work without culling
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			visible := 0
 			for range objects {
 				// Pretend we "render" everything
@@ -198,7 +198,7 @@ func BenchmarkMeshRenderingComparison(b *testing.B) {
 	}
 
 	b.Run("with_culling", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rast.ClearDepth()
 			fb.Clear()
 			rast.InvalidateFrustum()
@@ -211,7 +211,7 @@ func BenchmarkMeshRenderingComparison(b *testing.B) {
 	})
 
 	b.Run("without_culling", func(b *testing.B) {
-		for i := 0; i < b.N; i++ {
+		for range b.N {
 			rast.ClearDepth()
 			fb.Clear()
 

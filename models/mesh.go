@@ -283,7 +283,7 @@ func (m *Mesh) RemoveInternalFaces() int {
 		}
 
 		// Check all pairs for opposing normals
-		for i := 0; i < len(faceList); i++ {
+		for i := range faceList {
 			if toRemove[faceList[i].index] {
 				continue
 			}
