@@ -1,6 +1,7 @@
 FROM scratch
-COPY docs/trophy.glb /home/user/trophy.glb
+# COPY docs/trophy.glb /data/trophy.glb
 COPY trophy /usr/bin/trophy
-ENV HOME=/home/user
+ENV HOME=/data
+VOLUME ["/data"]
 ENTRYPOINT ["/usr/bin/trophy"]
-CMD ["trophy.glb"]
+# CMD ["trophy.glb"]
