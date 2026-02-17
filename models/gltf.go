@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"unsafe"
 
+	"github.com/ansipixels/trophy/math3d"
 	"github.com/qmuntal/gltf"
-	"github.com/taigrr/trophy/pkg/math3d"
 )
 
 // GLTFLoader loads GLTF/GLB files into Mesh format.

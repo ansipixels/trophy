@@ -31,10 +31,10 @@ import (
 	"fortio.org/cli"
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
+	"github.com/ansipixels/trophy/math3d"
+	"github.com/ansipixels/trophy/models"
+	"github.com/ansipixels/trophy/render"
 	"github.com/charmbracelet/harmonica"
-	"github.com/taigrr/trophy/pkg/math3d"
-	"github.com/taigrr/trophy/pkg/models"
-	"github.com/taigrr/trophy/pkg/render"
 )
 
 var (

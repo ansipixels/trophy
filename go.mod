@@ -1,4 +1,4 @@
-module github.com/taigrr/trophy
+module github.com/ansipixels/trophy
 
 go 1.24.0
 

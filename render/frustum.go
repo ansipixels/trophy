@@ -2,7 +2,7 @@
 package render
 
 import (
-	"github.com/taigrr/trophy/pkg/math3d"
+	"github.com/ansipixels/trophy/math3d"
 )
 
 // Plane represents a plane in 3D space using the equation: Ax + By + Cz + D = 0
