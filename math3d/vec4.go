@@ -32,16 +32,16 @@ func (v Vec4) PerspectiveDivide() Vec3 {
 
 // Add returns the vector sum.
 //
-//nolint:st1016 // a+b naming convention is clearer for vector operations
-func (a Vec4) Add(b Vec4) Vec4 {
-	return Vec4{a.X + b.X, a.Y + b.Y, a.Z + b.Z, a.W + b.W}
+
+func (v Vec4) Add(b Vec4) Vec4 {
+	return Vec4{v.X + b.X, v.Y + b.Y, v.Z + b.Z, v.W + b.W}
 }
 
 // Sub returns the vector difference.
 //
-//nolint:st1016 // a-b naming convention is clearer for vector operations
-func (a Vec4) Sub(b Vec4) Vec4 {
-	return Vec4{a.X - b.X, a.Y - b.Y, a.Z - b.Z, a.W - b.W}
+
+func (v Vec4) Sub(b Vec4) Vec4 {
+	return Vec4{v.X - b.X, v.Y - b.Y, v.Z - b.Z, v.W - b.W}
 }
 
 // Scale returns the scalar product.
@@ -51,9 +51,9 @@ func (v Vec4) Scale(s float64) Vec4 {
 
 // Dot returns the dot product.
 //
-//nolint:st1016 // a·b naming convention is clearer for vector operations
-func (a Vec4) Dot(b Vec4) float64 {
-	return a.X*b.X + a.Y*b.Y + a.Z*b.Z + a.W*b.W
+
+func (v Vec4) Dot(b Vec4) float64 {
+	return v.X*b.X + v.Y*b.Y + v.Z*b.Z + v.W*b.W
 }
 
 // Len returns the length.
@@ -72,12 +72,12 @@ func (v Vec4) Normalize() Vec4 {
 
 // Lerp returns linear interpolation.
 //
-//nolint:st1016 // a,b naming convention is clearer for interpolation
-func (a Vec4) Lerp(b Vec4, t float64) Vec4 {
+
+func (v Vec4) Lerp(b Vec4, t float64) Vec4 {
 	return Vec4{
-		a.X + (b.X-a.X)*t,
-		a.Y + (b.Y-a.Y)*t,
-		a.Z + (b.Z-a.Z)*t,
-		a.W + (b.W-a.W)*t,
+		v.X + (b.X-v.X)*t,
+		v.Y + (b.Y-v.Y)*t,
+		v.Z + (b.Z-v.Z)*t,
+		v.W + (b.W-v.W)*t,
 	}
 }

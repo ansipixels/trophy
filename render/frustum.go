@@ -1,3 +1,4 @@
+//nolint:dupl // TODO to be fixed but this is inherited code.
 package render
 
 import (
@@ -23,12 +24,12 @@ func (p *Plane) Normalize() {
 
 // DistanceToPoint returns the signed distance from the plane to a point.
 // Positive = in front (same side as normal), negative = behind.
-func (p Plane) DistanceToPoint(point math3d.Vec3) float64 {
+func (p *Plane) DistanceToPoint(point math3d.Vec3) float64 {
 	return p.Normal.Dot(point) + p.D
 }
 
 // SignedDistance is an alias for DistanceToPoint.
-func (p Plane) SignedDistance(point math3d.Vec3) float64 {
+func (p *Plane) SignedDistance(point math3d.Vec3) float64 {
 	return p.DistanceToPoint(point)
 }
 
@@ -113,8 +114,8 @@ type AABB struct {
 }
 
 // NewAABB creates an AABB from min and max points.
-func NewAABB(min, max math3d.Vec3) AABB {
-	return AABB{Min: min, Max: max}
+func NewAABB(minV, maxV math3d.Vec3) AABB {
+	return AABB{Min: minV, Max: maxV}
 }
 
 // Center returns the center of the AABB.

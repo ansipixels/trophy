@@ -1,3 +1,4 @@
+//nolint:dupl // TODO to be fixed but this is inherited code.
 package render
 
 import (

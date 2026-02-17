@@ -212,14 +212,14 @@ endsolid test`
 		t.Fatalf("Failed to load: %v", err)
 	}
 
-	min, max := mesh.GetBounds()
+	minV, maxV := mesh.GetBounds()
 
-	if min.X != -1 || min.Y != -2 || min.Z != -3 {
-		t.Errorf("BoundsMin = %v, want (-1, -2, -3)", min)
+	if minV.X != -1 || minV.Y != -2 || minV.Z != -3 {
+		t.Errorf("BoundsMin = %v, want (-1, -2, -3)", minV)
 	}
 
-	if max.X != 4 || max.Y != 5 || max.Z != 6 {
-		t.Errorf("BoundsMax = %v, want (4, 5, 6)", max)
+	if maxV.X != 4 || maxV.Y != 5 || maxV.Z != 6 {
+		t.Errorf("BoundsMax = %v, want (4, 5, 6)", maxV)
 	}
 }
 

@@ -1,5 +1,7 @@
 // Package render provides optimized software asterization routines using edge function rasterization.
 // Uses incremental updates to avoid recomputing barycentric coordinates per pixel.
+//
+//nolint:dupl,funlen // TODO dupl one to be fixed but this is inherited code.
 package render
 
 import (
@@ -11,6 +13,8 @@ import (
 // edgeFunction computes the signed area of the parallelogram formed by vertices.
 // Positive = left of edge, negative = right of edge, zero = on edge.
 // Returns A, B, C coefficients for: edge(x,y) = A*x + B*y + C.
+//
+//nolint:gocritic // mathematical convention for edge function coefficients
 func edgeCoeffs(x0, y0, x1, y1 float64) (A, B, C float64) {
 	A = y0 - y1 // dy
 	B = x1 - x0 // -dx
@@ -19,6 +23,8 @@ func edgeCoeffs(x0, y0, x1, y1 float64) (A, B, C float64) {
 }
 
 // edgeFunc evaluates edge function at point (x, y).
+//
+//nolint:gocritic // mathematical convention for edge function coefficients
 func edgeFunc(A, B, C, x, y float64) float64 {
 	return A*x + B*y + C
 }
@@ -171,6 +177,7 @@ func (r *Rasterizer) DrawMeshGouraudOpt(mesh MeshRenderer, transform math3d.Mat4
 		return
 	}
 
+	//nolint:intrange // TriangleCount() may have side effects
 	for i := 0; i < mesh.TriangleCount(); i++ {
 		face := mesh.GetFace(i)
 
@@ -339,6 +346,7 @@ func (r *Rasterizer) DrawMeshTexturedOpt(mesh MeshRenderer, transform math3d.Mat
 		return
 	}
 
+	//nolint:intrange // TriangleCount() may have side effects
 	for i := 0; i < mesh.TriangleCount(); i++ {
 		face := mesh.GetFace(i)
 

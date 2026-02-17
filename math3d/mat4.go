@@ -16,6 +16,8 @@ import "math"
 // | Xy Yy Zy Ty |   T = translation
 // | Xz Yz Zz Tz |
 // | 0  0  0  1  |.
+//
+//nolint:recvcheck // pointer receivers used only for mutating methods (Set, SetTranslation)
 type Mat4 [16]float64
 
 // Identity returns the identity matrix.
@@ -145,21 +147,21 @@ func Orthographic(left, right, bottom, top, near, far float64) Mat4 {
 	}
 }
 
-// Mul multiplies two matrices: a * b.
+// Mul multiplies two matrices: m * b.
 //
-//nolint:st1016 // a*b naming convention is clearer for matrix multiplication
-func (a Mat4) Mul(b Mat4) Mat4 {
-	var m Mat4
+
+func (m Mat4) Mul(b Mat4) Mat4 {
+	var result Mat4
 	for col := range 4 {
 		for row := range 4 {
 			var sum float64
 			for k := range 4 {
-				sum += a[row+k*4] * b[k+col*4]
+				sum += m[row+k*4] * b[k+col*4]
 			}
-			m[row+col*4] = sum
+			result[row+col*4] = sum
 		}
 	}
-	return m
+	return result
 }
 
 // MulVec3 transforms a Vec3 as a point (w=1).
