@@ -138,3 +138,16 @@ func (fb *Framebuffer) SavePNG(path string) error {
 	defer f.Close()
 	return png.Encode(f, fb.ToImage())
 }
+
+// Color is an alias for color.RGBA for convenience.
+type Color = color.RGBA
+
+// RGB creates a color from RGB values.
+func RGB(r, g, b uint8) color.RGBA {
+	return color.RGBA{r, g, b, 255}
+}
+
+// RGBA creates a color from RGBA values.
+func RGBA(r, g, b, a uint8) color.RGBA {
+	return color.RGBA{r, g, b, a}
+}

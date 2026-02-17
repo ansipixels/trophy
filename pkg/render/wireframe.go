@@ -120,9 +120,9 @@ func (w *Wireframe) DrawTransformedCube(transform math3d.Mat4, size float64, col
 // DrawAxes draws the coordinate axes at the origin.
 func (w *Wireframe) DrawAxes(length float64) {
 	origin := math3d.Zero3()
-	w.DrawLine3D(origin, math3d.V3(length, 0, 0), ColorRed)   // X axis
-	w.DrawLine3D(origin, math3d.V3(0, length, 0), ColorGreen) // Y axis
-	w.DrawLine3D(origin, math3d.V3(0, 0, length), ColorBlue)  // Z axis
+	w.DrawLine3D(origin, math3d.V3(length, 0, 0), RGB(255, 0, 0))   // X axis (red)
+	w.DrawLine3D(origin, math3d.V3(0, length, 0), RGB(0, 255, 0))   // Y axis (green)
+	w.DrawLine3D(origin, math3d.V3(0, 0, length), RGB(0, 0, 255))   // Z axis (blue)
 }
 
 // DrawGrid draws a grid on the XZ plane at y=0.
