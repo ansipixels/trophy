@@ -19,19 +19,19 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"math"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"fortio.org/cli"
 	"fortio.org/terminal/ansipixels"
 	"fortio.org/terminal/ansipixels/tcolor"
 	"github.com/charmbracelet/harmonica"
-	"github.com/spf13/cobra"
 	"github.com/taigrr/trophy/pkg/math3d"
 	"github.com/taigrr/trophy/pkg/models"
 	"github.com/taigrr/trophy/pkg/render"
@@ -39,119 +39,27 @@ import (
 
 var (
 	texturePath string
-	targetFPS   int
-	bgColor     string
+	targetFPS   float64
 )
 
 func main() {
-	cmd := &cobra.Command{
-		Use:   "trophy <model.obj|model.glb|model.stl>",
-		Short: "Terminal 3D Model Viewer",
-		Long: `trophy - Terminal 3D Model Viewer
+	flag.StringVar(&texturePath, "texture", "", "Path to texture image (PNG/JPG)")
+	flag.Float64Var(&targetFPS, "fps", 60, "Target FPS")
 
-View OBJ and GLB files in your terminal with full 3D rendering.
+	cli.ProgramName = "trophy"
+	cli.ArgsHelp = "<model.obj|model.glb|model.stl>"
+	cli.MinArgs = 1
+	cli.MaxArgs = 1
 
-Controls:
-  Mouse drag  - Rotate model
-  Scroll      - Zoom in/out
-  W/S/A/D     - Pitch and yaw
-  Q/E         - Roll left/right
-  Space       - Random spin
-  R           - Reset view
-  T           - Toggle texture
-  X           - Toggle wireframe
-  L           - Position light (mouse to aim, click to set)
-  ?           - Toggle HUD overlay
-  Esc         - Quit`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run(args[0])
-		},
+	cli.Main()
+
+	// At this point, cli.Main has validated arguments
+	modelPath := flag.Args()[0]
+
+	if err := run(modelPath); err != nil {
+		fmt.Fprintf(flag.CommandLine.Output(), "Error: %v\n", err)
+		cli.ExitFunction(1)
 	}
-
-	cmd.Flags().StringVar(&texturePath, "texture", "", "Path to texture image (PNG/JPG)")
-	cmd.Flags().IntVar(&targetFPS, "fps", 60, "Target FPS")
-	cmd.Flags().StringVar(&bgColor, "bg", "", "Background color (R,G,B)")
-
-	// Add info subcommand
-	infoCmd := &cobra.Command{
-		Use:   "info <model.obj|model.glb|model.stl>",
-		Short: "Display model information",
-		Long:  "Display detailed information about a 3D model file including format, polygon count, vertex count, and bounding box.",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInfo(args[0])
-		},
-	}
-	cmd.AddCommand(infoCmd)
-
-	if err := cmd.Execute(); err != nil {
-		os.Exit(1)
-	}
-}
-
-func runInfo(modelPath string) error {
-	ext := strings.ToLower(filepath.Ext(modelPath))
-
-	// Check file exists
-	info, err := os.Stat(modelPath)
-	if err != nil {
-		return fmt.Errorf("cannot access file: %w", err)
-	}
-
-	var mesh *models.Mesh
-	var hasEmbeddedTexture bool
-	var textureSize string
-
-	switch ext {
-	case ".glb", ".gltf":
-		var img image.Image
-		mesh, img, err = models.LoadGLBWithTexture(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-		if img != nil {
-			hasEmbeddedTexture = true
-			bounds := img.Bounds()
-			textureSize = fmt.Sprintf("%dx%d", bounds.Dx(), bounds.Dy())
-		}
-	case ".obj":
-		mesh, err = models.LoadOBJ(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-	case ".stl":
-		mesh, err = models.LoadSTL(modelPath)
-		if err != nil {
-			return fmt.Errorf("load model: %w", err)
-		}
-	default:
-		return fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
-	}
-
-	mesh.CalculateBounds()
-	size := mesh.Size()
-	center := mesh.Center()
-
-	// Format output
-	fmt.Printf("File:       %s\n", filepath.Base(modelPath))
-	fmt.Printf("Format:     %s\n", strings.ToUpper(strings.TrimPrefix(ext, ".")))
-	fmt.Printf("Size:       %.2f KB\n", float64(info.Size())/1024)
-	fmt.Println()
-	fmt.Printf("Vertices:   %d\n", mesh.VertexCount())
-	fmt.Printf("Triangles:  %d\n", mesh.TriangleCount())
-	fmt.Println()
-	fmt.Printf("Bounds Min: (%.3f, %.3f, %.3f)\n", mesh.BoundsMin.X, mesh.BoundsMin.Y, mesh.BoundsMin.Z)
-	fmt.Printf("Bounds Max: (%.3f, %.3f, %.3f)\n", mesh.BoundsMax.X, mesh.BoundsMax.Y, mesh.BoundsMax.Z)
-	fmt.Printf("Dimensions: %.3f x %.3f x %.3f\n", size.X, size.Y, size.Z)
-	fmt.Printf("Center:     (%.3f, %.3f, %.3f)\n", center.X, center.Y, center.Z)
-
-	if hasEmbeddedTexture {
-		fmt.Println()
-		fmt.Printf("Texture:    embedded (%s)\n", textureSize)
-	}
-
-	return nil
 }
 
 // RotationAxis tracks position and velocity for one rotation axis with spring decay
@@ -338,15 +246,6 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 }
 
 func run(modelPath string) (err error) {
-	// Parse background color
-	var bg color.RGBA
-	if bgColor != "" {
-		_, err := fmt.Sscanf(bgColor, "%d,%d,%d", &bg.R, &bg.G, &bg.B)
-		if err == nil {
-			bg.A = 255
-		}
-	}
-
 	// Initialize ansipixels for terminal rendering
 	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
 	if err := ap.Open(); err != nil {
@@ -372,7 +271,7 @@ func run(modelPath string) (err error) {
 	// Create renderer with framebuffer sized for terminal
 	// Using 2x height for half-block characters
 	fb := render.NewFramebuffer(termWidth, termHeight*2)
-	fb.BG = bg
+	fb.BG = color.RGBA{ap.Background.R, ap.Background.G, ap.Background.B, 255}
 
 	// Create camera
 	camera := render.NewCamera()
@@ -431,7 +330,7 @@ func run(modelPath string) (err error) {
 	fmt.Printf("Loaded: %s (%d vertices, %d triangles)\n", filepath.Base(modelPath), mesh.VertexCount(), mesh.TriangleCount())
 
 	// Initialize rotation and view state
-	rotation := NewRotationState(targetFPS)
+	rotation := NewRotationState(int(math.Round(targetFPS)))
 	viewState := NewViewState()
 
 	// Create HUD
