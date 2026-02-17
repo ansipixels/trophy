@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"strconv"
 	"strings"
@@ -257,4 +258,13 @@ func LoadOBJSmooth(path string) (*Mesh, error) {
 	loader := NewOBJLoader()
 	loader.SmoothNormals = true
 	return loader.LoadFile(path)
+}
+
+// LoadOBJFromFS loads an OBJ file from a filesystem interface.
+func LoadOBJFromFS(fsys fs.FS, path string) (*Mesh, error) {
+	data, err := fs.ReadFile(fsys, path)
+	if err != nil {
+		return nil, fmt.Errorf("read OBJ file: %w", err)
+	}
+	return NewOBJLoader().Load(strings.NewReader(string(data)), path)
 }

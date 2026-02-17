@@ -41,11 +41,14 @@ docker run -v `pwd`:/data -ti ghcr.io/ansipixels/trophy docs/trophy.glb
 ## Usage
 
 ```bash
+trophy help                   # See all the options and flags
+trophy -ls                    # list the res:* embedded models
+trophy res:teapot.stl         # Run the viewer for the Teapot embedded model
+trophy                        # Run the viewer for the Trophy embedded model
 trophy model.glb              # View a GLB model
 trophy model.obj              # View an OBJ model
 trophy model.stl              # View an STL model
 trophy -texture tex.png model.obj  # Apply custom texture
-trophy -bg 0,0,0 model.glb    # Black background
 trophy -fps 60 model.glb      # Higher framerate
 ```
 
