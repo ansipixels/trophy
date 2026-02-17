@@ -187,7 +187,8 @@ func (h *HUD) UpdateFPS() {
 func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.LightMode {
 		// Light mode indicator
-		ap.WriteCentered(ap.H-1, "%s◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel%s", tcolor.BrightYellow.Foreground(), tcolor.Reset)
+		ap.WriteCentered(ap.H-1, "%s◉ LIGHT MODE - Move mouse to position, click to set, Esc to cancel%s",
+			tcolor.BrightYellow.Foreground(), tcolor.Reset)
 		return
 	}
 
@@ -230,9 +231,9 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 	// Clamp to unit circle
 	lenSq := nx*nx + ny*ny
 	if lenSq > 1 {
-		len := math.Sqrt(lenSq)
-		nx /= len
-		ny /= len
+		length := math.Sqrt(lenSq)
+		nx /= length
+		ny /= length
 		lenSq = 1
 	}
 
@@ -243,6 +244,7 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 	return math3d.V3(nx, -ny, nz).Normalize()
 }
 
+//nolint:gocognit,gocyclo,funlen,maintidx // yeah it's kinda long.
 func run(modelPath string) int {
 	// Initialize ansipixels for terminal rendering
 	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
@@ -394,7 +396,7 @@ func run(modelPath string) int {
 			dt = 0.1
 		}
 		// Process keyboard input from ap.Data
-		if len(ap.Data) > 0 {
+		if len(ap.Data) > 0 { //nolint:nestif // it's just a big switch
 			for _, b := range ap.Data {
 				switch b {
 				case 'q', 'Q':
@@ -512,7 +514,7 @@ func run(modelPath string) int {
 
 		// Display using ansipixels
 		ap.ClearScreen()
-		if err := ap.ShowScaledImage(img); err != nil {
+		if err = ap.ShowScaledImage(img); err != nil {
 			log.Errf("show image: %v", err)
 			return false
 		}
