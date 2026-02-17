@@ -35,7 +35,7 @@ brew install ansipixels/tap/trophy
 
 Or even
 ```sh
-docker run -ti ghcr.io/ansipixels/trophy # but that's obviously slower
+docker run -v `pwd`:/data -ti ghcr.io/ansipixels/trophy docs/trophy.glb
 ```
 
 ## Usage
