@@ -130,6 +130,6 @@ _Benchmarks run on AMD EPYC 7642 48-Core, linux/amd64_
 
 ## Credits
 
-The  (Awesome!) original [github.com/taigrr/trophy](https://github.com/taigrr/trophy) was built with [Ultraviolet](https://github.com/charmbracelet/ultraviolet) for terminal rendering.
+The  (Awesome!) original [github.com/taigrr/trophy](https://github.com/taigrr/trophy) was built with [ultraviolet](https://github.com/charmbracelet/ultraviolet) for terminal rendering.
 
-This is the [Ansipixels](https://github.com/fortio/terminal/#fortioorgterminalansipixels) TUI version.
+This is the [Ansipixels](https://github.com/fortio/terminal/#fortioorgterminalansipixels) TUI version which 30% smaller binary and has faster/more stable FPS and I believe clearer/simpler main loop code.
