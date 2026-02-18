@@ -8,6 +8,7 @@ import (
 	"image"
 	_ "image/jpeg" // for decoding JPEG images in GLTF files
 	_ "image/png"  // for decoding PNG images in GLTF files
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -34,21 +35,42 @@ func NewGLTFLoader() *GLTFLoader {
 
 // LoadGLB loads a binary GLTF (.glb) file.
 func LoadGLB(path string) (*Mesh, error) {
+	fsys, fsPath := fsForPath(path)
+	return LoadGLBFromFS(fsys, fsPath)
+}
+
+// LoadGLBFromFS loads a binary GLTF (.glb) file from an fs.FS.
+func LoadGLBFromFS(fsys fs.FS, path string) (*Mesh, error) {
 	loader := NewGLTFLoader()
-	return loader.Load(path)
+	return loader.LoadFromFS(fsys, path)
 }
 
 // Load loads a GLTF or GLB file and returns a Mesh.
 func (l *GLTFLoader) Load(path string) (*Mesh, error) {
-	doc, err := gltf.Open(path)
+	fsys, fsPath := fsForPath(path)
+	return l.LoadFromFS(fsys, fsPath)
+}
+
+// LoadFromFS loads a GLTF or GLB file from an fs.FS and returns a Mesh.
+func (l *GLTFLoader) LoadFromFS(fsys fs.FS, path string) (*Mesh, error) {
+	doc, resourceFS, err := openGLTFDocumentFromFS(fsys, path)
 	if err != nil {
 		return nil, fmt.Errorf("open gltf: %w", err)
 	}
 
+	mesh, err := l.loadFromDocument(doc, path, resourceFS)
+	if err != nil {
+		return nil, err
+	}
+
+	return mesh, nil
+}
+
+func (l *GLTFLoader) loadFromDocument(doc *gltf.Document, path string, resourceFS fs.FS) (*Mesh, error) {
 	mesh := NewMesh(filepath.Base(path))
 
 	// Extract materials first
-	mesh.Materials = extractMaterials(doc, path)
+	mesh.Materials = extractMaterialsFromFS(doc, resourceFS)
 
 	// Process scene nodes with transforms (handles node hierarchy)
 	processedMeshes := make(map[int]bool)
@@ -60,7 +82,9 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 		}
 		scene := doc.Scenes[sceneIdx]
 		for _, nodeIdx := range scene.Nodes {
-			l.processNode(doc, nodeIdx, math3d.Identity(), mesh, processedMeshes)
+			if err := l.processNode(doc, nodeIdx, math3d.Identity(), mesh, processedMeshes); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		// No scenes defined, process all root nodes
@@ -75,7 +99,9 @@ func (l *GLTFLoader) Load(path string) (*Mesh, error) {
 				}
 			}
 			if isRoot {
-				l.processNode(doc, i, math3d.Identity(), mesh, processedMeshes)
+				if err := l.processNode(doc, i, math3d.Identity(), mesh, processedMeshes); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}
@@ -109,7 +135,7 @@ func (l *GLTFLoader) processNode(
 	parentTransform math3d.Mat4,
 	mesh *Mesh,
 	processedMeshes map[int]bool,
-) {
+) error {
 	node := doc.Nodes[nodeIdx]
 
 	// Build this node's local transform
@@ -149,13 +175,19 @@ func (l *GLTFLoader) processNode(
 	if node.Mesh != nil {
 		meshIdx := *node.Mesh
 		gltfMesh := doc.Meshes[meshIdx]
-		_ = l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform)
+		if err := l.processMeshWithTransform(doc, gltfMesh, mesh, worldTransform); err != nil {
+			return err
+		}
 		processedMeshes[meshIdx] = true
 	}
 
 	for _, childIdx := range node.Children {
-		l.processNode(doc, childIdx, worldTransform, mesh, processedMeshes)
+		if err := l.processNode(doc, childIdx, worldTransform, mesh, processedMeshes); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 // processMeshWithTransform extracts geometry from a GLTF mesh, applying the given transform.
@@ -248,7 +280,7 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 }
 
 // extractMaterials extracts all materials from a GLTF document.
-func extractMaterials(doc *gltf.Document, basePath string) []Material {
+func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 	materials := make([]Material, len(doc.Materials))
 
 	for i, mat := range doc.Materials {
@@ -287,7 +319,7 @@ func extractMaterials(doc *gltf.Document, basePath string) []Material {
 					tex := doc.Textures[texIdx]
 					if tex.Source != nil && *tex.Source < len(doc.Images) {
 						img := doc.Images[*tex.Source]
-						texImg := loadGLTFImage(doc, img, basePath)
+						texImg := loadGLTFImageFromFS(doc, img, resourceFS)
 						if texImg != nil {
 							m.BaseMap = texImg
 							m.HasTexture = true
@@ -304,7 +336,8 @@ func extractMaterials(doc *gltf.Document, basePath string) []Material {
 }
 
 // loadGLTFImage loads an image from GLTF (embedded or external).
-func loadGLTFImage(doc *gltf.Document, img *gltf.Image, basePath string) image.Image {
+// loadGLTFImageFromFS loads an image from GLTF using the provided filesystem.
+func loadGLTFImageFromFS(doc *gltf.Document, img *gltf.Image, resourceFS fs.FS) image.Image {
 	if img.BufferView != nil {
 		// Embedded image
 		bv := doc.BufferViews[*img.BufferView]
@@ -317,11 +350,8 @@ func loadGLTFImage(doc *gltf.Document, img *gltf.Image, basePath string) image.I
 				return decoded
 			}
 		}
-	} else if img.URI != "" {
-		// External image file
-		dir := filepath.Dir(basePath)
-		imgPath := filepath.Join(dir, img.URI)
-		data, err := os.ReadFile(imgPath)
+	} else if img.URI != "" && resourceFS != nil {
+		data, err := fs.ReadFile(resourceFS, img.URI)
 		if err == nil {
 			decoded, _, err := image.Decode(bytes.NewReader(data))
 			if err == nil {
@@ -330,6 +360,38 @@ func loadGLTFImage(doc *gltf.Document, img *gltf.Image, basePath string) image.I
 		}
 	}
 	return nil
+}
+
+func openGLTFDocumentFromFS(fsys fs.FS, path string) (*gltf.Document, fs.FS, error) {
+	file, err := fsys.Open(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	resourceFS := fsys
+	subDir := filepath.Dir(path)
+	if subDir != "." && subDir != "/" {
+		subDir = filepath.ToSlash(subDir)
+		if subFS, err := fs.Sub(fsys, subDir); err == nil {
+			resourceFS = subFS
+		} else {
+			return nil, nil, err
+		}
+	}
+
+	dec := gltf.NewDecoderFS(file, resourceFS)
+	doc := new(gltf.Document)
+	if err := dec.Decode(doc); err != nil {
+		return nil, nil, err
+	}
+	return doc, resourceFS, nil
+}
+
+func fsForPath(path string) (fs.FS, string) {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	return os.DirFS(dir), base
 }
 
 // readVec3Accessor reads Vec3 data from a GLTF accessor.
@@ -530,13 +592,20 @@ func float32frombits(b uint32) float32 {
 // LoadGLTFWithTextures loads a GLTF file and extracts embedded textures.
 // Returns the mesh and a map of image index to texture data.
 func LoadGLTFWithTextures(path string) (*Mesh, map[int][]byte, error) {
-	doc, err := gltf.Open(path)
+	fsys, fsPath := fsForPath(path)
+	return LoadGLTFWithTexturesFromFS(fsys, fsPath)
+}
+
+// LoadGLTFWithTexturesFromFS loads a GLTF file from an fs.FS and extracts textures.
+// Returns the mesh and a map of image index to texture data.
+func LoadGLTFWithTexturesFromFS(fsys fs.FS, path string) (*Mesh, map[int][]byte, error) {
+	doc, resourceFS, err := openGLTFDocumentFromFS(fsys, path)
 	if err != nil {
 		return nil, nil, fmt.Errorf("open gltf: %w", err)
 	}
 
 	loader := NewGLTFLoader()
-	mesh, err := loader.Load(path)
+	mesh, err := loader.loadFromDocument(doc, path, resourceFS)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -553,10 +622,7 @@ func LoadGLTFWithTextures(path string) (*Mesh, map[int][]byte, error) {
 				textures[i] = buf.Data[start:end]
 			}
 		} else if img.URI != "" {
-			// External texture file
-			dir := filepath.Dir(path)
-			texPath := filepath.Join(dir, img.URI)
-			data, err := os.ReadFile(texPath)
+			data, err := fs.ReadFile(resourceFS, img.URI)
 			if err == nil {
 				textures[i] = data
 			}
@@ -569,7 +635,14 @@ func LoadGLTFWithTextures(path string) (*Mesh, map[int][]byte, error) {
 // LoadGLBWithTexture loads a GLB file and returns the mesh plus the first embedded texture.
 // Returns (mesh, texture image, error). Texture may be nil if none embedded.
 func LoadGLBWithTexture(path string) (*Mesh, image.Image, error) {
-	mesh, textures, err := LoadGLTFWithTextures(path)
+	fsys, fsPath := fsForPath(path)
+	return LoadGLBWithTextureFromFS(fsys, fsPath)
+}
+
+// LoadGLBWithTextureFromFS loads a GLB file from an fs.FS and returns the mesh plus the first embedded texture.
+// Returns (mesh, texture image, error). Texture may be nil if none embedded.
+func LoadGLBWithTextureFromFS(fsys fs.FS, path string) (*Mesh, image.Image, error) {
+	mesh, textures, err := LoadGLTFWithTexturesFromFS(fsys, path)
 	if err != nil {
 		return nil, nil, err
 	}

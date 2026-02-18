@@ -19,3 +19,4 @@ trophy
 .golangci.yml
 # macos
 .DS_Store
+main

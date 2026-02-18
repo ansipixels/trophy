@@ -19,10 +19,12 @@
 package main
 
 import (
+	"embed"
 	"flag"
 	"fmt"
 	"image"
 	"image/color"
+	"io/fs"
 	"math"
 	"os"
 	"path/filepath"
@@ -42,21 +44,54 @@ import (
 var (
 	texturePath string
 	targetFPS   float64
+	// Embed default model files (GLB and STL only from docs/)
+	//go:embed docs/*.glb docs/*.stl
+	docsEmbedFS embed.FS
+	// docsFS is the docs directory exposed as the root of the embedded filesystem.
+	docsFS fs.FS
 )
+
+const embeddedPrefix = "res:"
+
+func init() {
+	var err error
+	docsFS, err = fs.Sub(docsEmbedFS, "docs")
+	if err != nil {
+		panic(fmt.Sprintf("failed to create embedded filesystem: %v", err))
+	}
+}
 
 func main() {
 	flag.StringVar(&texturePath, "texture", "", "Path to texture image (PNG/JPG)")
 	flag.Float64Var(&targetFPS, "fps", 60, "Target FPS")
-
-	cli.ProgramName = "trophy"
-	cli.ArgsHelp = "<model.obj|model.glb|model.stl>"
-	cli.MinArgs = 1
+	listEmbedded := flag.Bool("ls", false, "List embedded model options (res: files) and exit")
+	cli.ArgsHelp = "<model.obj|model.glb|model.stl> (default: " + embeddedPrefix + "trophy.glb)"
+	cli.MinArgs = 0
 	cli.MaxArgs = 1
-
 	cli.Main()
+	// Handle -ls flag
+	if *listEmbedded {
+		entries, err := fs.ReadDir(docsFS, ".")
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error reading embedded files: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("Embedded model options:")
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				fmt.Printf("  %s%s\n", embeddedPrefix, entry.Name())
+			}
+		}
+		os.Exit(0)
+	}
 
 	// At this point, cli.Main has validated arguments
-	modelPath := flag.Args()[0]
+	var modelPath string
+	if flag.NArg() > 0 {
+		modelPath = flag.Arg(0)
+	} else {
+		modelPath = embeddedPrefix + "trophy.glb" // Use embedded model
+	}
 	os.Exit(run(modelPath))
 }
 
@@ -244,11 +279,66 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 	return math3d.V3(nx, -ny, nz).Normalize()
 }
 
+// selectFilesystem resolves a file path to the appropriate filesystem.
+// Supports "res:" URI prefix for explicit embedded files,
+// or searches embedded FS first, then falls back to local FS.
+func selectFilesystem(modelPath string) (fs.FS, string, error) {
+	// Check for explicit res: prefix
+	if strings.HasPrefix(modelPath, embeddedPrefix) {
+		cleanPath := modelPath[len(embeddedPrefix):]
+		// Verify it exists in embedded FS
+		if _, err := fs.Stat(docsFS, cleanPath); err != nil {
+			return nil, "", fmt.Errorf("file not found in embedded filesystem: %s", cleanPath)
+		}
+		return docsFS, cleanPath, nil
+	}
+
+	// Try embedded FS first
+	if _, err := fs.Stat(docsFS, modelPath); err == nil {
+		return docsFS, modelPath, nil
+	}
+
+	// Fall back to local FS
+	if _, err := os.Stat(modelPath); err == nil {
+		// Clean the path for os.DirFS compatibility (remove ./ prefix, etc.)
+		cleanPath := filepath.Clean(modelPath)
+		return os.DirFS("."), cleanPath, nil
+	}
+
+	return nil, "", fmt.Errorf("file not found in embedded or local filesystem: %s", modelPath)
+}
+
+// LoadModelFromFS loads a model from a filesystem interface (embed.FS or os.DirFS).
+// GLB/GLTF files are decoded using the provided filesystem, avoiding temp files.
+func LoadModelFromFS(fsys fs.FS, modelPath string) (*models.Mesh, image.Image, error) {
+	ext := strings.ToLower(filepath.Ext(modelPath))
+
+	switch ext {
+	case ".glb", ".gltf":
+		mesh, img, err := models.LoadGLBWithTextureFromFS(fsys, modelPath)
+		return mesh, img, err
+
+	case ".obj":
+		mesh, err := models.LoadOBJFromFS(fsys, modelPath)
+		return mesh, nil, err
+	case ".stl":
+		mesh, err := models.LoadSTLFromFS(fsys, modelPath)
+		return mesh, nil, err
+	default:
+		return nil, nil, fmt.Errorf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
+	}
+}
+
 //nolint:gocognit,gocyclo,funlen,maintidx // yeah it's kinda long.
 func run(modelPath string) int {
+	// Resolve the filesystem based on the model path
+	// Supports "res:" URI prefix or searches embedded first with fallback to local
+	modelFS, resolvedPath, err := selectFilesystem(modelPath)
+	if err != nil {
+		return log.FErrf("resolve model path: %v", err)
+	}
 	// Initialize ansipixels for terminal rendering
 	ap := ansipixels.NewAnsiPixels(float64(targetFPS))
-	var err error
 	if err = ap.Open(); err != nil {
 		return log.FErrf("open ansipixels: %v", err)
 	}
@@ -287,33 +377,18 @@ func run(modelPath string) int {
 	}
 
 	// Load model
-	ext := strings.ToLower(filepath.Ext(modelPath))
 	var mesh *models.Mesh
+	var embeddedImg image.Image
 
-	switch ext {
-	case ".glb", ".gltf":
-		var embeddedImg image.Image
-		mesh, embeddedImg, err = models.LoadGLBWithTexture(modelPath)
-		if err != nil {
-			return log.FErrf("load model: %v", err)
-		}
-		// Use embedded texture if no explicit texture and one exists
-		if texture == nil && embeddedImg != nil {
-			texture = render.TextureFromImage(embeddedImg)
-			log.Infof("Using embedded texture: %dx%d", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
-		}
-	case ".obj":
-		mesh, err = models.LoadOBJ(modelPath)
-		if err != nil {
-			return log.FErrf("load model: %v", err)
-		}
-	case ".stl":
-		mesh, err = models.LoadSTL(modelPath)
-		if err != nil {
-			return log.FErrf("load model: %v", err)
-		}
-	default:
-		return log.FErrf("unsupported format: %s (use .obj, .glb, or .stl)", ext)
+	mesh, embeddedImg, err = LoadModelFromFS(modelFS, resolvedPath)
+	if err != nil {
+		return log.FErrf("load model: %v", err)
+	}
+
+	// Use embedded texture if no explicit texture and one exists
+	if texture == nil && embeddedImg != nil {
+		texture = render.TextureFromImage(embeddedImg)
+		log.Infof("Using embedded texture: %dx%d", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
 	}
 
 	// Generate fallback texture if none

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"strconv"
@@ -381,4 +382,13 @@ func LoadSTLClean(path string) (*Mesh, error) {
 	loader := NewSTLLoader()
 	loader.CleanMesh = true
 	return loader.LoadFile(path)
+}
+
+// LoadSTLFromFS loads an STL file from a filesystem interface.
+func LoadSTLFromFS(fsys fs.FS, path string) (*Mesh, error) {
+	data, err := fs.ReadFile(fsys, path)
+	if err != nil {
+		return nil, fmt.Errorf("read STL file: %w", err)
+	}
+	return NewSTLLoader().Load(bytes.NewReader(data), path)
 }
