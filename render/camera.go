@@ -10,18 +10,15 @@ import (
 type Camera struct {
 	// Position in world space
 	Position math3d.Vec3
-
 	// Orientation (Euler angles in radians)
 	Pitch float64 // Rotation around X axis (look up/down)
 	Yaw   float64 // Rotation around Y axis (look left/right)
 	Roll  float64 // Rotation around Z axis (tilt)
-
 	// Projection parameters
 	FOV         float64 // Vertical field of view in radians
 	AspectRatio float64 // Width / Height
 	Near        float64 // Near clipping plane
 	Far         float64 // Far clipping plane
-
 	// Cached matrices (computed on demand)
 	viewMatrix     math3d.Mat4
 	projMatrix     math3d.Mat4
@@ -134,15 +131,12 @@ func (c *Camera) ViewProjectionMatrix() math3d.Mat4 {
 func (c *Camera) computeViewMatrix() {
 	// Build view matrix from position and rotation
 	// View = Rotation * Translation(-position)
-
 	// Rotation matrix (inverse of camera orientation)
 	rot := math3d.RotateZ(-c.Roll).Mul(
 		math3d.RotateX(-c.Pitch)).Mul(
 		math3d.RotateY(-c.Yaw))
-
 	// Translation matrix (move world opposite to camera position)
 	trans := math3d.Translate(c.Position.Negate())
-
 	c.viewMatrix = rot.Mul(trans)
 }
 
@@ -173,7 +167,6 @@ func (c *Camera) Rotate(deltaPitch, deltaYaw, deltaRoll float64) {
 	c.Pitch += deltaPitch
 	c.Yaw += deltaYaw
 	c.Roll += deltaRoll
-
 	// Clamp pitch to avoid gimbal lock issues
 	const maxPitch = math.Pi/2 - 0.01
 	if c.Pitch > maxPitch {
@@ -182,18 +175,15 @@ func (c *Camera) Rotate(deltaPitch, deltaYaw, deltaRoll float64) {
 	if c.Pitch < -maxPitch {
 		c.Pitch = -maxPitch
 	}
-
 	c.viewDirty = true
 }
 
 // LookAt makes the camera look at a target point.
 func (c *Camera) LookAt(target math3d.Vec3) {
 	dir := target.Sub(c.Position).Normalize()
-
 	c.Pitch = math.Asin(dir.Y)
 	c.Yaw = math.Atan2(-dir.X, -dir.Z)
 	c.Roll = 0
-
 	c.viewDirty = true
 }
 
@@ -202,24 +192,19 @@ func (c *Camera) LookAt(target math3d.Vec3) {
 func (c *Camera) WorldToScreen(worldPos math3d.Vec3, screenWidth, screenHeight int) (x, y, depth float64, visible bool) {
 	// Transform to clip space
 	clipPos := c.ViewProjectionMatrix().MulVec4(math3d.V4FromV3(worldPos, 1))
-
 	// Check if behind camera
 	if clipPos.W <= 0 {
 		return 0, 0, 0, false
 	}
-
 	// Perspective divide to NDC (-1 to 1)
 	ndc := clipPos.PerspectiveDivide()
-
 	// Check if in view frustum
 	if ndc.X < -1 || ndc.X > 1 || ndc.Y < -1 || ndc.Y > 1 || ndc.Z < -1 || ndc.Z > 1 {
 		return 0, 0, 0, false
 	}
-
 	// Convert to screen coordinates
 	x = (ndc.X + 1) * 0.5 * float64(screenWidth)
 	y = (1 - ndc.Y) * 0.5 * float64(screenHeight) // Y is flipped
 	depth = ndc.Z
-
 	return x, y, depth, true
 }

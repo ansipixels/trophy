@@ -57,24 +57,19 @@ func (l *GLTFLoader) LoadFromFS(fsys fs.FS, path string) (*Mesh, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open gltf: %w", err)
 	}
-
 	mesh, err := l.loadFromDocument(doc, path, resourceFS)
 	if err != nil {
 		return nil, err
 	}
-
 	return mesh, nil
 }
 
 func (l *GLTFLoader) loadFromDocument(doc *gltf.Document, path string, resourceFS fs.FS) (*Mesh, error) {
 	mesh := NewMesh(filepath.Base(path))
-
 	// Extract materials first
 	mesh.Materials = extractMaterialsFromFS(doc, resourceFS)
-
 	// Process scene nodes with transforms (handles node hierarchy)
 	processedMeshes := make(map[int]bool)
-
 	if len(doc.Scenes) > 0 {
 		sceneIdx := 0
 		if doc.Scene != nil {
@@ -105,7 +100,6 @@ func (l *GLTFLoader) loadFromDocument(doc *gltf.Document, path string, resourceF
 			}
 		}
 	}
-
 	// Calculate normals if needed
 	hasNormals := false
 	for _, v := range mesh.Vertices {
@@ -114,7 +108,6 @@ func (l *GLTFLoader) loadFromDocument(doc *gltf.Document, path string, resourceF
 			break
 		}
 	}
-
 	if l.CalculateNormals && !hasNormals {
 		if l.SmoothNormals {
 			mesh.CalculateSmoothNormals()
@@ -122,9 +115,7 @@ func (l *GLTFLoader) loadFromDocument(doc *gltf.Document, path string, resourceF
 			mesh.CalculateNormals()
 		}
 	}
-
 	mesh.CalculateBounds()
-
 	return mesh, nil
 }
 
@@ -137,10 +128,8 @@ func (l *GLTFLoader) processNode(
 	processedMeshes map[int]bool,
 ) error {
 	node := doc.Nodes[nodeIdx]
-
 	// Build this node's local transform
 	localTransform := math3d.Identity()
-
 	if node.Translation != [3]float64{0, 0, 0} {
 		localTransform = localTransform.Mul(math3d.Translate(math3d.V3(
 			node.Translation[0],
@@ -148,7 +137,6 @@ func (l *GLTFLoader) processNode(
 			node.Translation[2],
 		)))
 	}
-
 	if node.Rotation != [4]float64{0, 0, 0, 1} {
 		localTransform = localTransform.Mul(math3d.QuatToMat4(
 			node.Rotation[0],
@@ -157,7 +145,6 @@ func (l *GLTFLoader) processNode(
 			node.Rotation[3],
 		))
 	}
-
 	if node.Scale != [3]float64{1, 1, 1} && node.Scale != [3]float64{0, 0, 0} {
 		localTransform = localTransform.Mul(math3d.Scale(math3d.V3(
 			node.Scale[0],
@@ -165,13 +152,10 @@ func (l *GLTFLoader) processNode(
 			node.Scale[2],
 		)))
 	}
-
 	if node.Matrix != [16]float64{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1} {
 		localTransform = math3d.Mat4FromSlice(node.Matrix[:])
 	}
-
 	worldTransform := parentTransform.Mul(localTransform)
-
 	if node.Mesh != nil {
 		meshIdx := *node.Mesh
 		gltfMesh := doc.Meshes[meshIdx]
@@ -180,13 +164,11 @@ func (l *GLTFLoader) processNode(
 		}
 		processedMeshes[meshIdx] = true
 	}
-
 	for _, childIdx := range node.Children {
 		if err := l.processNode(doc, childIdx, worldTransform, mesh, processedMeshes); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -196,17 +178,14 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 		if prim.Mode != gltf.PrimitiveTriangles && prim.Mode != 0 {
 			continue
 		}
-
 		posIdx, ok := prim.Attributes[gltf.POSITION]
 		if !ok {
 			continue
 		}
-
 		positions, err := readVec3Accessor(doc, posIdx)
 		if err != nil {
 			return fmt.Errorf("read positions: %w", err)
 		}
-
 		var normals []math3d.Vec3
 		if normIdx, ok := prim.Attributes[gltf.NORMAL]; ok {
 			normals, err = readVec3Accessor(doc, normIdx)
@@ -214,7 +193,6 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 				return fmt.Errorf("read normals: %w", err)
 			}
 		}
-
 		var uvs []math3d.Vec2
 		if uvIdx, ok := prim.Attributes[gltf.TEXCOORD_0]; ok {
 			uvs, err = readVec2Accessor(doc, uvIdx)
@@ -222,21 +200,16 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 				return fmt.Errorf("read uvs: %w", err)
 			}
 		}
-
 		materialIdx := -1
 		if prim.Material != nil {
 			materialIdx = *prim.Material
 		}
-
 		baseVertex := len(mesh.Vertices)
-
 		for i := range positions {
 			worldPos := transform.MulVec3(positions[i])
-
 			v := MeshVertex{
 				Position: worldPos,
 			}
-
 			if i < len(normals) {
 				v.Normal = transform.MulVec3Dir(normals[i]).Normalize()
 			}
@@ -245,13 +218,11 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 			}
 			mesh.Vertices = append(mesh.Vertices, v)
 		}
-
 		if prim.Indices != nil {
 			indices, err := readIndices(doc, *prim.Indices)
 			if err != nil {
 				return fmt.Errorf("read indices: %w", err)
 			}
-
 			for i := 0; i+2 < len(indices); i += 3 {
 				mesh.Faces = append(mesh.Faces, Face{
 					V: [3]int{
@@ -275,14 +246,12 @@ func (l *GLTFLoader) processMeshWithTransform(doc *gltf.Document, m *gltf.Mesh, 
 			}
 		}
 	}
-
 	return nil
 }
 
 // extractMaterials extracts all materials from a GLTF document.
 func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 	materials := make([]Material, len(doc.Materials))
-
 	for i, mat := range doc.Materials {
 		m := Material{
 			Name:      mat.Name,
@@ -290,10 +259,8 @@ func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 			Metallic:  0,
 			Roughness: 1,
 		}
-
 		if mat.PBRMetallicRoughness != nil {
 			pbr := mat.PBRMetallicRoughness
-
 			// Extract base color
 			if pbr.BaseColorFactor != nil {
 				m.BaseColor = [4]float64{
@@ -303,7 +270,6 @@ func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 					float64(pbr.BaseColorFactor[3]),
 				}
 			}
-
 			// Extract metallic/roughness
 			if pbr.MetallicFactor != nil {
 				m.Metallic = float64(*pbr.MetallicFactor)
@@ -311,7 +277,6 @@ func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 			if pbr.RoughnessFactor != nil {
 				m.Roughness = float64(*pbr.RoughnessFactor)
 			}
-
 			// Extract base color texture if present
 			if pbr.BaseColorTexture != nil {
 				texIdx := pbr.BaseColorTexture.Index
@@ -328,10 +293,8 @@ func extractMaterialsFromFS(doc *gltf.Document, resourceFS fs.FS) []Material {
 				}
 			}
 		}
-
 		materials[i] = m
 	}
-
 	return materials
 }
 
@@ -368,7 +331,6 @@ func openGLTFDocumentFromFS(fsys fs.FS, path string) (*gltf.Document, fs.FS, err
 		return nil, nil, err
 	}
 	defer file.Close()
-
 	resourceFS := fsys
 	subDir := filepath.Dir(path)
 	if subDir != "." && subDir != "/" {
@@ -379,7 +341,6 @@ func openGLTFDocumentFromFS(fsys fs.FS, path string) (*gltf.Document, fs.FS, err
 			return nil, nil, err
 		}
 	}
-
 	dec := gltf.NewDecoderFS(file, resourceFS)
 	doc := new(gltf.Document)
 	if err := dec.Decode(doc); err != nil {
@@ -400,22 +361,18 @@ func readVec3Accessor(doc *gltf.Document, accessorIdx int) ([]math3d.Vec3, error
 	if accessor.Type != gltf.AccessorVec3 {
 		return nil, fmt.Errorf("expected VEC3, got %v", accessor.Type)
 	}
-
 	data, err := readAccessorData(doc, accessor)
 	if err != nil {
 		return nil, err
 	}
-
 	floats, ok := data.([][3]float32)
 	if !ok {
 		return nil, errors.New("unexpected data type for VEC3")
 	}
-
 	result := make([]math3d.Vec3, len(floats))
 	for i, f := range floats {
 		result[i] = math3d.V3(float64(f[0]), float64(f[1]), float64(f[2]))
 	}
-
 	return result, nil
 }
 
@@ -425,34 +382,28 @@ func readVec2Accessor(doc *gltf.Document, accessorIdx int) ([]math3d.Vec2, error
 	if accessor.Type != gltf.AccessorVec2 {
 		return nil, fmt.Errorf("expected VEC2, got %v", accessor.Type)
 	}
-
 	data, err := readAccessorData(doc, accessor)
 	if err != nil {
 		return nil, err
 	}
-
 	floats, ok := data.([][2]float32)
 	if !ok {
 		return nil, errors.New("unexpected data type for VEC2")
 	}
-
 	result := make([]math3d.Vec2, len(floats))
 	for i, f := range floats {
 		result[i] = math3d.V2(float64(f[0]), float64(f[1]))
 	}
-
 	return result, nil
 }
 
 // readIndices reads index data from a GLTF accessor.
 func readIndices(doc *gltf.Document, accessorIdx int) ([]int, error) {
 	accessor := doc.Accessors[accessorIdx]
-
 	data, err := readAccessorData(doc, accessor)
 	if err != nil {
 		return nil, err
 	}
-
 	switch v := data.(type) {
 	case []uint8:
 		result := make([]int, len(v))
@@ -482,10 +433,8 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 	if accessor.BufferView == nil {
 		return nil, errors.New("accessor has no buffer view")
 	}
-
 	bufferView := doc.BufferViews[*accessor.BufferView]
 	buffer := doc.Buffers[bufferView.Buffer]
-
 	// Get buffer data
 	var bufData []byte
 	if buffer.URI == "" {
@@ -495,16 +444,13 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 		// External file - need to load relative to document
 		return nil, errors.New("external buffers not supported yet")
 	}
-
 	if bufData == nil {
 		return nil, errors.New("buffer has no data")
 	}
-
 	// Calculate data bounds
 	start := bufferView.ByteOffset + accessor.ByteOffset
 	stride := bufferView.ByteStride
 	count := accessor.Count
-
 	// Read based on component type and accessor type
 	//nolint:exhaustive // handles common types, error returned for unsupported ones
 	switch accessor.Type {
@@ -520,7 +466,6 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 			}
 		}
 		return result, nil
-
 	case gltf.AccessorVec2:
 		if stride == 0 {
 			stride = 8 // 2 floats * 4 bytes
@@ -533,7 +478,6 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 			}
 		}
 		return result, nil
-
 	case gltf.AccessorScalar:
 		if stride == 0 {
 			//nolint:exhaustive // handles common types
@@ -546,7 +490,6 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 				stride = 4
 			}
 		}
-
 		//nolint:exhaustive // handles common types, error returned for unsupported ones
 		switch accessor.ComponentType {
 		case gltf.ComponentUbyte:
@@ -574,7 +517,6 @@ func readAccessorData(doc *gltf.Document, accessor *gltf.Accessor) (any, error) 
 			return result, nil
 		}
 	}
-
 	return nil, fmt.Errorf("unsupported accessor type: %v / %v", accessor.Type, accessor.ComponentType)
 }
 
@@ -603,13 +545,11 @@ func LoadGLTFWithTexturesFromFS(fsys fs.FS, path string) (*Mesh, map[int][]byte,
 	if err != nil {
 		return nil, nil, fmt.Errorf("open gltf: %w", err)
 	}
-
 	loader := NewGLTFLoader()
 	mesh, err := loader.loadFromDocument(doc, path, resourceFS)
 	if err != nil {
 		return nil, nil, err
 	}
-
 	// Extract textures
 	textures := make(map[int][]byte)
 	for i, img := range doc.Images {
@@ -628,7 +568,6 @@ func LoadGLTFWithTexturesFromFS(fsys fs.FS, path string) (*Mesh, map[int][]byte,
 			}
 		}
 	}
-
 	return mesh, textures, nil
 }
 
@@ -646,7 +585,6 @@ func LoadGLBWithTextureFromFS(fsys fs.FS, path string) (*Mesh, image.Image, erro
 	if err != nil {
 		return nil, nil, err
 	}
-
 	// Find the first texture
 	var textureImg image.Image
 	for _, data := range textures {
@@ -658,6 +596,5 @@ func LoadGLBWithTextureFromFS(fsys fs.FS, path string) (*Mesh, image.Image, erro
 			}
 		}
 	}
-
 	return mesh, textureImg, nil
 }

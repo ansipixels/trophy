@@ -94,7 +94,6 @@ func Rotate(axis Vec3, angle float64) Mat4 {
 	c, s := math.Cos(angle), math.Sin(angle)
 	t := 1 - c
 	x, y, z := axis.X, axis.Y, axis.Z
-
 	return Mat4{
 		t*x*x + c, t*x*y + s*z, t*x*z - s*y, 0,
 		t*x*y - s*z, t*y*y + c, t*y*z + s*x, 0,
@@ -108,7 +107,6 @@ func LookAt(eye, center, up Vec3) Mat4 {
 	f := center.Sub(eye).Normalize() // Forward
 	s := f.Cross(up).Normalize()     // Right
 	u := s.Cross(f)                  // Up (recomputed)
-
 	return Mat4{
 		s.X, u.X, -f.X, 0,
 		s.Y, u.Y, -f.Y, 0,
@@ -124,7 +122,6 @@ func LookAt(eye, center, up Vec3) Mat4 {
 func Perspective(fovy, aspect, near, far float64) Mat4 {
 	f := 1.0 / math.Tan(fovy/2)
 	nf := 1.0 / (near - far)
-
 	return Mat4{
 		f / aspect, 0, 0, 0,
 		0, f, 0, 0,
@@ -138,7 +135,6 @@ func Orthographic(left, right, bottom, top, near, far float64) Mat4 {
 	rl := 1.0 / (right - left)
 	tb := 1.0 / (top - bottom)
 	fn := 1.0 / (far - near)
-
 	return Mat4{
 		2 * rl, 0, 0, 0,
 		0, 2 * tb, 0, 0,
@@ -148,8 +144,6 @@ func Orthographic(left, right, bottom, top, near, far float64) Mat4 {
 }
 
 // Mul multiplies two matrices: m * b.
-//
-
 func (m Mat4) Mul(b Mat4) Mat4 {
 	var result Mat4
 	for col := range 4 {
@@ -221,30 +215,24 @@ func (m Mat4) Inverse() Mat4 {
 	if det == 0 {
 		return Identity()
 	}
-
 	invDet := 1.0 / det
 	var inv Mat4
-
 	inv[0] = (m[5]*(m[10]*m[15]-m[14]*m[11]) - m[9]*(m[6]*m[15]-m[14]*m[7]) + m[13]*(m[6]*m[11]-m[10]*m[7])) * invDet
 	inv[1] = -(m[1]*(m[10]*m[15]-m[14]*m[11]) - m[9]*(m[2]*m[15]-m[14]*m[3]) + m[13]*(m[2]*m[11]-m[10]*m[3])) * invDet
 	inv[2] = (m[1]*(m[6]*m[15]-m[14]*m[7]) - m[5]*(m[2]*m[15]-m[14]*m[3]) + m[13]*(m[2]*m[7]-m[6]*m[3])) * invDet
 	inv[3] = -(m[1]*(m[6]*m[11]-m[10]*m[7]) - m[5]*(m[2]*m[11]-m[10]*m[3]) + m[9]*(m[2]*m[7]-m[6]*m[3])) * invDet
-
 	inv[4] = -(m[4]*(m[10]*m[15]-m[14]*m[11]) - m[8]*(m[6]*m[15]-m[14]*m[7]) + m[12]*(m[6]*m[11]-m[10]*m[7])) * invDet
 	inv[5] = (m[0]*(m[10]*m[15]-m[14]*m[11]) - m[8]*(m[2]*m[15]-m[14]*m[3]) + m[12]*(m[2]*m[11]-m[10]*m[3])) * invDet
 	inv[6] = -(m[0]*(m[6]*m[15]-m[14]*m[7]) - m[4]*(m[2]*m[15]-m[14]*m[3]) + m[12]*(m[2]*m[7]-m[6]*m[3])) * invDet
 	inv[7] = (m[0]*(m[6]*m[11]-m[10]*m[7]) - m[4]*(m[2]*m[11]-m[10]*m[3]) + m[8]*(m[2]*m[7]-m[6]*m[3])) * invDet
-
 	inv[8] = (m[4]*(m[9]*m[15]-m[13]*m[11]) - m[8]*(m[5]*m[15]-m[13]*m[7]) + m[12]*(m[5]*m[11]-m[9]*m[7])) * invDet
 	inv[9] = -(m[0]*(m[9]*m[15]-m[13]*m[11]) - m[8]*(m[1]*m[15]-m[13]*m[3]) + m[12]*(m[1]*m[11]-m[9]*m[3])) * invDet
 	inv[10] = (m[0]*(m[5]*m[15]-m[13]*m[7]) - m[4]*(m[1]*m[15]-m[13]*m[3]) + m[12]*(m[1]*m[7]-m[5]*m[3])) * invDet
 	inv[11] = -(m[0]*(m[5]*m[11]-m[9]*m[7]) - m[4]*(m[1]*m[11]-m[9]*m[3]) + m[8]*(m[1]*m[7]-m[5]*m[3])) * invDet
-
 	inv[12] = -(m[4]*(m[9]*m[14]-m[13]*m[10]) - m[8]*(m[5]*m[14]-m[13]*m[6]) + m[12]*(m[5]*m[10]-m[9]*m[6])) * invDet
 	inv[13] = (m[0]*(m[9]*m[14]-m[13]*m[10]) - m[8]*(m[1]*m[14]-m[13]*m[2]) + m[12]*(m[1]*m[10]-m[9]*m[2])) * invDet
 	inv[14] = -(m[0]*(m[5]*m[14]-m[13]*m[6]) - m[4]*(m[1]*m[14]-m[13]*m[2]) + m[12]*(m[1]*m[6]-m[5]*m[2])) * invDet
 	inv[15] = (m[0]*(m[5]*m[10]-m[9]*m[6]) - m[4]*(m[1]*m[10]-m[9]*m[2]) + m[8]*(m[1]*m[6]-m[5]*m[2])) * invDet
-
 	return inv
 }
 
@@ -290,7 +278,6 @@ func QuatToMat4(x, y, z, w float64) Mat4 {
 		z /= n
 		w /= n
 	}
-
 	xx := x * x
 	yy := y * y
 	zz := z * z
@@ -300,7 +287,6 @@ func QuatToMat4(x, y, z, w float64) Mat4 {
 	wx := w * x
 	wy := w * y
 	wz := w * z
-
 	return Mat4{
 		1 - 2*(yy+zz), 2 * (xy + wz), 2 * (xz - wy), 0,
 		2 * (xy - wz), 1 - 2*(xx+zz), 2 * (yz + wx), 0,

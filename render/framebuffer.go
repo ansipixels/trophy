@@ -69,7 +69,6 @@ func (fb *Framebuffer) DrawLine(x0, y0, x1, y1 int, c color.RGBA) {
 		sy = -1
 	}
 	err := dx + dy
-
 	for {
 		fb.SetPixel(x0, y0, c)
 		if x0 == x1 && y0 == y1 {

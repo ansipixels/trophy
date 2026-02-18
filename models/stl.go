@@ -58,7 +58,6 @@ func (l *STLLoader) LoadFile(path string) (*Mesh, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read STL file: %w", err)
 	}
-
 	return l.LoadBytes(data, path)
 }
 
@@ -87,7 +86,6 @@ func isBinarySTL(data []byte) bool {
 	if len(data) < 84 {
 		return false
 	}
-
 	// Check if it starts with "solid" (ASCII format)
 	trimmed := bytes.TrimLeft(data, " \t\r\n")
 	if bytes.HasPrefix(trimmed, []byte("solid")) {
@@ -101,7 +99,6 @@ func isBinarySTL(data []byte) bool {
 		}
 		return false
 	}
-
 	return true
 }
 
@@ -110,22 +107,17 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 	if len(data) < 84 {
 		return nil, fmt.Errorf("binary STL too short: %d bytes", len(data))
 	}
-
 	// Skip 80-byte header
 	triCount := binary.LittleEndian.Uint32(data[80:84])
-
 	expectedSize := 84 + triCount*50
 	//nolint:gosec // G115: comparison is safe as triCount is from file header
 	if uint32(len(data)) < expectedSize {
 		return nil, fmt.Errorf("binary STL truncated: expected %d bytes, got %d", expectedSize, len(data))
 	}
-
 	mesh := NewMesh(name)
-
 	// Vertex deduplication map using quantized positions for tolerance-based matching
 	// This handles floating point precision issues from float32 STL data
 	vertexMap := make(map[quantizedKey]int)
-
 	offset := 84
 	for range triCount {
 		// Read normal (3 floats = 12 bytes)
@@ -135,7 +127,6 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 			float64(readFloat32LE(data[offset+8:])),
 		)
 		offset += 12
-
 		// Read 3 vertices (9 floats = 36 bytes)
 		var faceVerts [3]int
 		for v := range 3 {
@@ -145,7 +136,6 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 				float64(readFloat32LE(data[offset+8:])),
 			)
 			offset += 12
-
 			if l.NoDedupe {
 				// No deduplication: each vertex is unique
 				idx := len(mesh.Vertices)
@@ -172,34 +162,27 @@ func (l *STLLoader) loadBinary(data []byte, name string) (*Mesh, error) {
 				}
 			}
 		}
-
 		// Skip 2-byte attribute byte count
 		offset += 2
-
 		// Reverse winding to match GLTF/OBJ loaders (swap indices 1 and 2)
 		mesh.Faces = append(mesh.Faces, Face{
 			V:        [3]int{faceVerts[0], faceVerts[2], faceVerts[1]},
 			Material: -1,
 		})
 	}
-
 	// Normalize accumulated normals (unless NoDedupe was used)
 	if !l.NoDedupe {
 		for i := range mesh.Vertices {
 			mesh.Vertices[i].Normal = mesh.Vertices[i].Normal.Normalize()
 		}
 	}
-
 	mesh.CalculateBounds()
-
 	if l.SmoothNormals {
 		mesh.CalculateSmoothNormals()
 	}
-
 	if l.CleanMesh {
 		mesh.CleanMesh()
 	}
-
 	return mesh, nil
 }
 
@@ -214,37 +197,29 @@ func readFloat32LE(data []byte) float32 {
 //nolint:funlen,gocyclo,gocognit // inherited code.
 func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 	mesh := NewMesh(name)
-
 	// Vertex deduplication map using quantized positions for tolerance-based matching
 	vertexMap := make(map[quantizedKey]int)
-
 	scanner := bufio.NewScanner(bytes.NewReader(data))
 	lineNum := 0
-
 	var currentNormal math3d.Vec3
 	var faceVerts []int
 	inFacet := false
 	inLoop := false
-
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-
 		if len(line) == 0 {
 			continue
 		}
-
 		fields := strings.Fields(line)
 		if len(fields) == 0 {
 			continue
 		}
-
 		switch strings.ToLower(fields[0]) {
 		case "solid":
 			if len(fields) > 1 {
 				mesh.Name = fields[1]
 			}
-
 		case "facet":
 			if len(fields) >= 5 && strings.ToLower(fields[1]) == "normal" {
 				nx, err := strconv.ParseFloat(fields[2], 64)
@@ -263,12 +238,10 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 			}
 			inFacet = true
 			faceVerts = nil
-
 		case "outer":
 			if len(fields) >= 2 && strings.ToLower(fields[1]) == "loop" {
 				inLoop = true
 			}
-
 		case "vertex":
 			if !inFacet || !inLoop {
 				return nil, fmt.Errorf("line %d: vertex outside facet/loop", lineNum)
@@ -276,7 +249,6 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 			if len(fields) < 4 {
 				return nil, fmt.Errorf("line %d: vertex needs x y z", lineNum)
 			}
-
 			x, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				return nil, fmt.Errorf("line %d: invalid vertex x: %w", lineNum, err)
@@ -289,9 +261,7 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 			if err != nil {
 				return nil, fmt.Errorf("line %d: invalid vertex z: %w", lineNum, err)
 			}
-
 			pos := math3d.V3(x, y, z)
-
 			if l.NoDedupe {
 				// No deduplication: each vertex is unique
 				idx := len(mesh.Vertices)
@@ -317,10 +287,8 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 					faceVerts = append(faceVerts, idx)
 				}
 			}
-
 		case "endloop":
 			inLoop = false
-
 		case "endfacet":
 			if len(faceVerts) >= 3 {
 				// Reverse winding to match GLTF/OBJ loaders (swap indices 1 and 2)
@@ -331,36 +299,28 @@ func (l *STLLoader) loadASCII(data []byte, name string) (*Mesh, error) {
 			}
 			inFacet = false
 			faceVerts = nil
-
 		case "endsolid":
 			// Done
-
 		default:
 			// Ignore unknown
 		}
 	}
-
 	if err := scanner.Err(); err != nil {
 		return nil, fmt.Errorf("error reading ASCII STL: %w", err)
 	}
-
 	// Normalize accumulated normals (unless NoDedupe was used)
 	if !l.NoDedupe {
 		for i := range mesh.Vertices {
 			mesh.Vertices[i].Normal = mesh.Vertices[i].Normal.Normalize()
 		}
 	}
-
 	mesh.CalculateBounds()
-
 	if l.SmoothNormals {
 		mesh.CalculateSmoothNormals()
 	}
-
 	if l.CleanMesh {
 		mesh.CleanMesh()
 	}
-
 	return mesh, nil
 }
 
