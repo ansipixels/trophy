@@ -51,7 +51,10 @@ var (
 	docsFS fs.FS
 )
 
-const embeddedPrefix = "res:"
+const (
+	embeddedPrefix = "res:"
+	initialCameraZ = 3.0
+)
 
 func init() {
 	var err error
@@ -343,7 +346,7 @@ func run(modelPath string) int {
 	camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
 	camera.SetFOV(math.Pi / 3)
 	camera.SetClipPlanes(0.1, 100)
-	camera.SetPosition(math3d.V3(0, 0, 5))
+	camera.SetPosition(math3d.V3(0, 0, initialCameraZ))
 	camera.LookAt(math3d.V3(0, 0, 0))
 	rasterizer := render.NewRasterizer(camera, fb)
 	// Load texture if specified
@@ -391,20 +394,15 @@ func run(modelPath string) int {
 	const torqueStrength = 3.0
 	// Main loop
 	lastFrame := time.Now()
-	cameraZ := 5.0
+	cameraZ := initialCameraZ
 	lastMouseX, lastMouseY := 0, 0
+	zoomChange := 0.0
 	ap.OnMouse = func() {
 		switch {
 		case ap.MouseWheelUp():
-			cameraZ -= 0.5
-			if cameraZ < 1 {
-				cameraZ = 1
-			}
+			zoomChange = -0.5
 		case ap.MouseWheelDown():
-			cameraZ += 0.5
-			if cameraZ > 20 {
-				cameraZ = 20
-			}
+			zoomChange = 0.5
 		case ap.LeftClick():
 		case ap.LeftDrag():
 			dx := ap.Mx - lastMouseX
@@ -426,6 +424,7 @@ func run(modelPath string) int {
 	// Update framebuffer and camera aspect ratio on terminal resize
 	ap.OnResize = func() error {
 		fb.Resize(ap.W, ap.H*2)
+		rasterizer.Resize()
 		camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
 		return nil
 	}
@@ -454,8 +453,9 @@ func run(modelPath string) int {
 					inputTorque.yaw = torqueStrength
 				case 'r', 'R':
 					rotation.Reset()
-					cameraZ = 5.0
+					cameraZ = initialCameraZ
 					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+					zoomChange = 0
 				case 't', 'T':
 					// Toggle texture
 					viewState.TextureEnabled = !viewState.TextureEnabled
@@ -478,12 +478,10 @@ func run(modelPath string) int {
 					viewState.ShowHUD = !viewState.ShowHUD
 				case '+', '=':
 					// Zoom in
-					cameraZ = max(1., cameraZ-0.5)
-					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+					zoomChange = -0.5
 				case '-', '_':
 					// Zoom out
-					cameraZ = min(20., cameraZ+0.5)
-					camera.SetPosition(math3d.V3(0, 0, cameraZ))
+					zoomChange = 0.5
 				case ' ':
 					// Toggle spin mode
 					viewState.SpinMode = !viewState.SpinMode
@@ -500,6 +498,17 @@ func run(modelPath string) int {
 					return false
 				}
 			}
+		}
+		if zoomChange != 0 {
+			cameraZ += zoomChange
+			if cameraZ < 1 {
+				cameraZ = 1
+			}
+			if cameraZ > 20 {
+				cameraZ = 20
+			}
+			camera.SetPosition(math3d.V3(0, 0, cameraZ))
+			zoomChange = 0
 		}
 		// Apply input torque and decay it
 		rotation.ApplyImpulse(
