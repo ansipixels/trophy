@@ -282,64 +282,40 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 // selectFilesystem resolves a file path to the appropriate filesystem.
 // Supports "res:" URI prefix for explicit embedded files,
 // or searches embedded FS first, then falls back to local FS.
-// Returns (filesystem, path, isEmbedded, error).
-// isEmbedded indicates whether the file comes from the embedded FS (vs local disk).
-func selectFilesystem(modelPath string) (fs.FS, string, bool, error) {
+func selectFilesystem(modelPath string) (fs.FS, string, error) {
 	// Check for explicit res: prefix
 	if strings.HasPrefix(modelPath, embeddedPrefix) {
 		cleanPath := modelPath[len(embeddedPrefix):]
 		// Verify it exists in embedded FS
 		if _, err := fs.Stat(docsFS, cleanPath); err != nil {
-			return nil, "", false, fmt.Errorf("file not found in embedded filesystem: %s", cleanPath)
+			return nil, "", fmt.Errorf("file not found in embedded filesystem: %s", cleanPath)
 		}
-		return docsFS, cleanPath, true, nil
+		return docsFS, cleanPath, nil
 	}
 
 	// Try embedded FS first
 	if _, err := fs.Stat(docsFS, modelPath); err == nil {
-		return docsFS, modelPath, true, nil
+		return docsFS, modelPath, nil
 	}
 
 	// Fall back to local FS
 	if _, err := os.Stat(modelPath); err == nil {
 		// Clean the path for os.DirFS compatibility (remove ./ prefix, etc.)
 		cleanPath := filepath.Clean(modelPath)
-		return os.DirFS("."), cleanPath, false, nil
+		return os.DirFS("."), cleanPath, nil
 	}
 
-	return nil, "", false, fmt.Errorf("file not found in embedded or local filesystem: %s", modelPath)
+	return nil, "", fmt.Errorf("file not found in embedded or local filesystem: %s", modelPath)
 }
 
 // LoadModelFromFS loads a model from a filesystem interface (embed.FS or os.DirFS).
-// If copyGLBToTemp is true, GLB files are read from fsys and written to a temp file
-// since the gltf library requires a real file path.
-// If copyGLBToTemp is false, the modelPath is used directly (for local files).
-func LoadModelFromFS(fsys fs.FS, modelPath string, copyGLBToTemp bool) (*models.Mesh, image.Image, error) {
+// GLB/GLTF files are decoded using the provided filesystem, avoiding temp files.
+func LoadModelFromFS(fsys fs.FS, modelPath string) (*models.Mesh, image.Image, error) {
 	ext := strings.ToLower(filepath.Ext(modelPath))
 
 	switch ext {
 	case ".glb", ".gltf":
-		// For GLTF, the gltf library requires file path access, not abstract fs.FS
-		if copyGLBToTemp {
-			// Read from virtual FS and write to temp file
-			data, err := fs.ReadFile(fsys, modelPath)
-			if err != nil {
-				return nil, nil, fmt.Errorf("read glb file: %w", err)
-			}
-			tempFile, err := os.CreateTemp("", "model-*.glb")
-			if err != nil {
-				return nil, nil, err
-			}
-			defer os.Remove(tempFile.Name())
-			if _, err := tempFile.Write(data); err != nil {
-				tempFile.Close()
-				return nil, nil, err
-			}
-			tempFile.Close()
-			return models.LoadGLBWithTexture(tempFile.Name())
-		}
-		// Local file - use the path directly with the gltf loader
-		mesh, img, err := models.LoadGLBWithTexture(modelPath)
+		mesh, img, err := models.LoadGLBWithTextureFromFS(fsys, modelPath)
 		return mesh, img, err
 
 	case ".obj":
@@ -357,7 +333,7 @@ func LoadModelFromFS(fsys fs.FS, modelPath string, copyGLBToTemp bool) (*models.
 func run(modelPath string) int {
 	// Resolve the filesystem based on the model path
 	// Supports "res:" URI prefix or searches embedded first with fallback to local
-	modelFS, resolvedPath, isEmbedded, err := selectFilesystem(modelPath)
+	modelFS, resolvedPath, err := selectFilesystem(modelPath)
 	if err != nil {
 		return log.FErrf("resolve model path: %v", err)
 	}
@@ -404,7 +380,7 @@ func run(modelPath string) int {
 	var mesh *models.Mesh
 	var embeddedImg image.Image
 
-	mesh, embeddedImg, err = LoadModelFromFS(modelFS, resolvedPath, isEmbedded)
+	mesh, embeddedImg, err = LoadModelFromFS(modelFS, resolvedPath)
 	if err != nil {
 		return log.FErrf("load model: %v", err)
 	}
