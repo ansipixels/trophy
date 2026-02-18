@@ -9,7 +9,7 @@
 
 Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your terminal.
 
-![Trophy Demo](docs/trophy.gif)
+![Trophy Demo](docs/demo.gif)
 
 ## Features
 
