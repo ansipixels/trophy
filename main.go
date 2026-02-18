@@ -84,7 +84,6 @@ func main() {
 		}
 		os.Exit(0)
 	}
-
 	// At this point, cli.Main has validated arguments
 	var modelPath string
 	if flag.NArg() > 0 {
@@ -115,7 +114,6 @@ func NewRotationAxis(fps int) RotationAxis {
 func (a *RotationAxis) Update(damping bool) {
 	// Apply velocity to position
 	a.Position += a.Velocity
-
 	// Use spring to animate velocity toward 0 (smooth deceleration)
 	if damping {
 		a.Velocity, a.velAccel = a.velSpring.Update(a.Velocity, a.velAccel, 0)
@@ -226,20 +224,15 @@ func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 			tcolor.BrightYellow.Foreground(), tcolor.Reset)
 		return
 	}
-
 	if !h.state.ShowHUD {
 		return
 	}
-
 	// Top left: FPS
 	ap.WriteAt(0, 0, tcolor.Green.Foreground()+"%.0f FPS "+tcolor.Reset, h.fps)
-
 	// Top middle: filename
 	ap.WriteCentered(0, "%s", h.filename)
-
 	// Top right: polygon count
 	ap.WriteRight(0, tcolor.Cyan.Foreground()+"%d polys"+tcolor.Reset, h.polyCount)
-
 	// Bottom: mode indicators
 	checkTex := "[ ]"
 	if h.state.TextureEnabled && h.state.RenderMode != RenderModeWireframe {
@@ -249,9 +242,7 @@ func (h *HUD) Draw(ap *ansipixels.AnsiPixels) {
 	if h.state.RenderMode == RenderModeWireframe {
 		checkWire = "[✓]"
 	}
-
 	ap.WriteAt(0, ap.H-1, "%s Texture  %s X-Ray (wireframe)", checkTex, checkWire)
-
 	// Bottom right: light hint
 	ap.WriteRight(ap.H-1, "%sL: position light%s", tcolor.Yellow.Foreground(), tcolor.Reset)
 }
@@ -262,7 +253,6 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 	// Normalize to [-1, 1]
 	nx := (float64(screenX)/float64(width))*2 - 1
 	ny := (float64(screenY)/float64(height))*2 - 1
-
 	// Clamp to unit circle
 	lenSq := nx*nx + ny*ny
 	if lenSq > 1 {
@@ -271,10 +261,8 @@ func (v *ViewState) ScreenToLightDir(screenX, screenY, width, height int) math3d
 		ny /= length
 		lenSq = 1
 	}
-
 	// Z component (hemisphere projection)
 	nz := math.Sqrt(1 - lenSq)
-
 	// Return as light direction (pointing toward the object)
 	return math3d.V3(nx, -ny, nz).Normalize()
 }
@@ -292,19 +280,16 @@ func selectFilesystem(modelPath string) (fs.FS, string, error) {
 		}
 		return docsFS, cleanPath, nil
 	}
-
 	// Try embedded FS first
 	if _, err := fs.Stat(docsFS, modelPath); err == nil {
 		return docsFS, modelPath, nil
 	}
-
 	// Fall back to local FS
 	if _, err := os.Stat(modelPath); err == nil {
 		// Clean the path for os.DirFS compatibility (remove ./ prefix, etc.)
 		cleanPath := filepath.Clean(modelPath)
 		return os.DirFS("."), cleanPath, nil
 	}
-
 	return nil, "", fmt.Errorf("file not found in embedded or local filesystem: %s", modelPath)
 }
 
@@ -312,12 +297,10 @@ func selectFilesystem(modelPath string) (fs.FS, string, error) {
 // GLB/GLTF files are decoded using the provided filesystem, avoiding temp files.
 func LoadModelFromFS(fsys fs.FS, modelPath string) (*models.Mesh, image.Image, error) {
 	ext := strings.ToLower(filepath.Ext(modelPath))
-
 	switch ext {
 	case ".glb", ".gltf":
 		mesh, img, err := models.LoadGLBWithTextureFromFS(fsys, modelPath)
 		return mesh, img, err
-
 	case ".obj":
 		mesh, err := models.LoadOBJFromFS(fsys, modelPath)
 		return mesh, nil, err
@@ -351,12 +334,10 @@ func run(modelPath string) int {
 	ap.SyncBackgroundColor()
 	ap.MouseTrackingOn()
 	ap.HideCursor()
-
 	// Create renderer with framebuffer sized for terminal
 	// Using 2x height for half-block characters
 	fb := render.NewFramebuffer(ap.W, ap.H*2)
 	fb.BG = color.RGBA{ap.Background.R, ap.Background.G, ap.Background.B, 255}
-
 	// Create camera
 	camera := render.NewCamera()
 	camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
@@ -364,9 +345,7 @@ func run(modelPath string) int {
 	camera.SetClipPlanes(0.1, 100)
 	camera.SetPosition(math3d.V3(0, 0, 5))
 	camera.LookAt(math3d.V3(0, 0, 0))
-
 	rasterizer := render.NewRasterizer(camera, fb)
-
 	// Load texture if specified
 	var texture *render.Texture
 	if texturePath != "" {
@@ -375,36 +354,28 @@ func run(modelPath string) int {
 			return log.FErrf("Could not load texture: %v", err)
 		}
 	}
-
 	// Load model
 	var mesh *models.Mesh
 	var embeddedImg image.Image
-
 	mesh, embeddedImg, err = LoadModelFromFS(modelFS, resolvedPath)
 	if err != nil {
 		return log.FErrf("load model: %v", err)
 	}
-
 	// Use embedded texture if no explicit texture and one exists
 	if texture == nil && embeddedImg != nil {
 		texture = render.TextureFromImage(embeddedImg)
 		log.Infof("Using embedded texture: %dx%d", embeddedImg.Bounds().Dx(), embeddedImg.Bounds().Dy())
 	}
-
 	// Generate fallback texture if none
 	if texture == nil {
 		texture = render.NewCheckerTexture(64, 64, 8, render.RGB(200, 200, 200), render.RGB(100, 100, 100))
 	}
-
 	fmt.Printf("Loaded: %s (%d vertices, %d triangles)\n", filepath.Base(modelPath), mesh.VertexCount(), mesh.TriangleCount())
-
 	// Initialize rotation and view state
 	rotation := NewRotationState(int(math.Round(targetFPS)))
 	viewState := NewViewState()
-
 	// Create HUD
 	hud := NewHUD(filepath.Base(modelPath), mesh.TriangleCount(), viewState)
-
 	// Center and scale model
 	mesh.CalculateBounds()
 	center := mesh.Center()
@@ -418,13 +389,10 @@ func run(modelPath string) int {
 	// Input state
 	inputTorque := struct{ pitch, yaw, roll float64 }{}
 	const torqueStrength = 3.0
-
 	// Main loop
 	lastFrame := time.Now()
-
 	cameraZ := 5.0
 	lastMouseX, lastMouseY := 0, 0
-
 	ap.OnMouse = func() {
 		switch {
 		case ap.MouseWheelUp():
@@ -447,7 +415,6 @@ func run(modelPath string) int {
 		if viewState.LightMode {
 			// Convert screen coordinates to light direction
 			viewState.PendingLight = viewState.ScreenToLightDir(ap.Mx, ap.My, ap.W, ap.H)
-
 			// Check for mouse click to confirm light position
 			if ap.MouseRelease() {
 				viewState.LightDir = viewState.PendingLight
@@ -462,7 +429,6 @@ func run(modelPath string) int {
 		camera.SetAspectRatio(float64(fb.Width) / float64(fb.Height))
 		return nil
 	}
-
 	now := time.Now()
 	err = ap.FPSTicks(func() bool {
 		dt := now.Sub(lastFrame).Seconds()
@@ -535,7 +501,6 @@ func run(modelPath string) int {
 				}
 			}
 		}
-
 		// Apply input torque and decay it
 		rotation.ApplyImpulse(
 			inputTorque.pitch*dt,
@@ -545,28 +510,22 @@ func run(modelPath string) int {
 		inputTorque.pitch *= 0.9
 		inputTorque.yaw *= 0.9
 		inputTorque.roll *= 0.9
-
 		// Update springs (harmonica handles timing internally)
 		rotation.Update(!viewState.SpinMode)
-
 		// Build transform
 		transform := math3d.RotateX(rotation.Pitch.Position).
 			Mul(math3d.RotateY(rotation.Yaw.Position)).
 			Mul(math3d.RotateZ(rotation.Roll.Position))
-
 		// Render
 		fb.Clear()
 		rasterizer.ClearDepth()
-
 		// Choose light direction (pending if in light mode, otherwise current)
 		lightDir := viewState.LightDir
 		if viewState.LightMode {
 			lightDir = viewState.PendingLight
 		}
-
 		// Set backface culling mode
 		rasterizer.DisableBackfaceCulling = !viewState.BackfaceCull
-
 		// Draw mesh based on render mode
 		switch viewState.RenderMode {
 		case RenderModeWireframe:
@@ -583,10 +542,8 @@ func run(modelPath string) int {
 				rasterizer.DrawMeshGouraudOpt(mesh, transform, render.RGB(200, 200, 200), lightDir)
 			}
 		}
-
 		// Convert framebuffer to image for ansipixels
 		img := fb.ToImage()
-
 		// Display using ansipixels
 		ap.ClearScreen()
 		if err = ap.ShowScaledImage(img); err != nil {

@@ -1,4 +1,3 @@
-//nolint:dupl // TODO to be fixed but this is inherited code.
 package render
 
 import (
@@ -55,55 +54,46 @@ const (
 // The resulting planes have normals pointing inward.
 func NewFrustumFromMatrix(m math3d.Mat4) Frustum {
 	var f Frustum
-
 	// Extract rows of the matrix for plane extraction.
 	// For column-major matrix m, row i element j is at m[i + j*4].
 	// Row 0: m[0], m[4], m[8], m[12]
 	// Row 1: m[1], m[5], m[9], m[13]
 	// Row 2: m[2], m[6], m[10], m[14]
 	// Row 3: m[3], m[7], m[11], m[15]
-
 	// Left plane: row3 + row0
 	f.Planes[FrustumLeft] = Plane{
 		Normal: math3d.V3(m[3]+m[0], m[7]+m[4], m[11]+m[8]),
 		D:      m[15] + m[12],
 	}
-
 	// Right plane: row3 - row0
 	f.Planes[FrustumRight] = Plane{
 		Normal: math3d.V3(m[3]-m[0], m[7]-m[4], m[11]-m[8]),
 		D:      m[15] - m[12],
 	}
-
 	// Bottom plane: row3 + row1
 	f.Planes[FrustumBottom] = Plane{
 		Normal: math3d.V3(m[3]+m[1], m[7]+m[5], m[11]+m[9]),
 		D:      m[15] + m[13],
 	}
-
 	// Top plane: row3 - row1
 	f.Planes[FrustumTop] = Plane{
 		Normal: math3d.V3(m[3]-m[1], m[7]-m[5], m[11]-m[9]),
 		D:      m[15] - m[13],
 	}
-
 	// Near plane: row3 + row2
 	f.Planes[FrustumNear] = Plane{
 		Normal: math3d.V3(m[3]+m[2], m[7]+m[6], m[11]+m[10]),
 		D:      m[15] + m[14],
 	}
-
 	// Far plane: row3 - row2
 	f.Planes[FrustumFar] = Plane{
 		Normal: math3d.V3(m[3]-m[2], m[7]-m[6], m[11]-m[10]),
 		D:      m[15] - m[14],
 	}
-
 	// Normalize all planes
 	for i := range f.Planes {
 		f.Planes[i].Normalize()
 	}
-
 	return f
 }
 
@@ -152,18 +142,15 @@ func (b AABB) Transform(m math3d.Mat4) AABB {
 		{X: b.Min.X, Y: b.Max.Y, Z: b.Max.Z},
 		{X: b.Max.X, Y: b.Max.Y, Z: b.Max.Z},
 	}
-
 	// Transform all corners and find new bounds
 	transformed := m.MulVec3(corners[0])
 	newMin := transformed
 	newMax := transformed
-
 	for i := 1; i < 8; i++ {
 		transformed = m.MulVec3(corners[i])
 		newMin = newMin.Min(transformed)
 		newMax = newMax.Max(transformed)
 	}
-
 	return AABB{Min: newMin, Max: newMax}
 }
 
@@ -174,51 +161,43 @@ func (b AABB) ContainsPoint(p math3d.Vec3) bool {
 		p.Z >= b.Min.Z && p.Z <= b.Max.Z
 }
 
-// IntersectAABB tests if the AABB intersects or is inside the frustum.
-// Returns true if any part of the AABB is visible.
-// Uses the "positive vertex" optimization for faster rejection.
-func (f Frustum) IntersectAABB(box AABB) bool {
-	for i := range f.Planes {
-		plane := f.Planes[i]
-
-		// Find the "positive vertex" - the corner of the AABB furthest in the direction of the plane normal.
-		// This is the corner that would be outside if the entire box is outside.
-		pVertex := math3d.V3(
+func frustumAABBVertex(box AABB, plane Plane, positive bool) math3d.Vec3 {
+	if positive {
+		return math3d.V3(
 			selectComponent(plane.Normal.X >= 0, box.Max.X, box.Min.X),
 			selectComponent(plane.Normal.Y >= 0, box.Max.Y, box.Min.Y),
 			selectComponent(plane.Normal.Z >= 0, box.Max.Z, box.Min.Z),
 		)
+	}
+	return math3d.V3(
+		selectComponent(plane.Normal.X >= 0, box.Min.X, box.Max.X),
+		selectComponent(plane.Normal.Y >= 0, box.Min.Y, box.Max.Y),
+		selectComponent(plane.Normal.Z >= 0, box.Min.Z, box.Max.Z),
+	)
+}
 
-		// If the positive vertex is outside this plane, the entire box is outside the frustum
-		if plane.DistanceToPoint(pVertex) < 0 {
+func (f Frustum) testAABB(box AABB, positive bool) bool {
+	for i := range f.Planes {
+		plane := f.Planes[i]
+		vertex := frustumAABBVertex(box, plane, positive)
+		if plane.DistanceToPoint(vertex) < 0 {
 			return false
 		}
 	}
-
-	// The box is at least partially inside all planes
 	return true
+}
+
+// IntersectAABB tests if the AABB intersects or is inside the frustum.
+// Returns true if any part of the AABB is visible.
+// Uses the "positive vertex" optimization for faster rejection.
+func (f Frustum) IntersectAABB(box AABB) bool {
+	return f.testAABB(box, true)
 }
 
 // ContainsAABB tests if the AABB is completely inside the frustum.
 // Returns true only if all 8 corners are inside all 6 planes.
 func (f Frustum) ContainsAABB(box AABB) bool {
-	for i := range f.Planes {
-		plane := f.Planes[i]
-
-		// Find the "negative vertex" - the corner closest to the plane in the normal direction.
-		nVertex := math3d.V3(
-			selectComponent(plane.Normal.X >= 0, box.Min.X, box.Max.X),
-			selectComponent(plane.Normal.Y >= 0, box.Min.Y, box.Max.Y),
-			selectComponent(plane.Normal.Z >= 0, box.Min.Z, box.Max.Z),
-		)
-
-		// If the negative vertex is outside, the box is not fully contained
-		if plane.DistanceToPoint(nVertex) < 0 {
-			return false
-		}
-	}
-
-	return true
+	return f.testAABB(box, false)
 }
 
 // ContainsPoint tests if a point is inside the frustum.

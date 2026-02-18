@@ -13,7 +13,6 @@ type Mesh struct {
 	Vertices  []MeshVertex
 	Faces     []Face
 	Materials []Material
-
 	// Bounding box (calculated on load)
 	BoundsMin math3d.Vec3
 	BoundsMax math3d.Vec3
@@ -58,10 +57,8 @@ func (m *Mesh) CalculateBounds() {
 	if len(m.Vertices) == 0 {
 		return
 	}
-
 	m.BoundsMin = m.Vertices[0].Position
 	m.BoundsMax = m.Vertices[0].Position
-
 	for _, v := range m.Vertices[1:] {
 		m.BoundsMin = m.BoundsMin.Min(v.Position)
 		m.BoundsMax = m.BoundsMax.Max(v.Position)
@@ -97,11 +94,9 @@ func (m *Mesh) CalculateNormals() {
 		v0 := m.Vertices[f.V[0]].Position
 		v1 := m.Vertices[f.V[1]].Position
 		v2 := m.Vertices[f.V[2]].Position
-
 		edge1 := v1.Sub(v0)
 		edge2 := v2.Sub(v0)
 		normal := edge1.Cross(edge2).Normalize()
-
 		// Assign to vertices (flat shading - each face has its own normal)
 		m.Vertices[f.V[0]].Normal = normal
 		m.Vertices[f.V[1]].Normal = normal
@@ -115,22 +110,18 @@ func (m *Mesh) CalculateSmoothNormals() {
 	for i := range m.Vertices {
 		m.Vertices[i].Normal = math3d.Zero3()
 	}
-
 	// Accumulate face normals per vertex
 	for _, f := range m.Faces {
 		v0 := m.Vertices[f.V[0]].Position
 		v1 := m.Vertices[f.V[1]].Position
 		v2 := m.Vertices[f.V[2]].Position
-
 		edge1 := v1.Sub(v0)
 		edge2 := v2.Sub(v0)
 		normal := edge1.Cross(edge2) // Don't normalize yet
-
 		m.Vertices[f.V[0]].Normal = m.Vertices[f.V[0]].Normal.Add(normal)
 		m.Vertices[f.V[1]].Normal = m.Vertices[f.V[1]].Normal.Add(normal)
 		m.Vertices[f.V[2]].Normal = m.Vertices[f.V[2]].Normal.Add(normal)
 	}
-
 	// Normalize all accumulated normals
 	for i := range m.Vertices {
 		m.Vertices[i].Normal = m.Vertices[i].Normal.Normalize()
@@ -228,10 +219,8 @@ func (m *Mesh) DeduplicateFaces() int {
 	if len(m.Faces) == 0 {
 		return 0
 	}
-
 	seen := make(map[[3]int]bool)
 	kept := make([]Face, 0, len(m.Faces))
-
 	for _, f := range m.Faces {
 		key := faceKey(f.V[0], f.V[1], f.V[2])
 		if !seen[key] {
@@ -239,7 +228,6 @@ func (m *Mesh) DeduplicateFaces() int {
 			kept = append(kept, f)
 		}
 	}
-
 	removed := len(m.Faces) - len(kept)
 	m.Faces = kept
 	return removed
@@ -254,14 +242,12 @@ func (m *Mesh) RemoveInternalFaces() int {
 	if len(m.Faces) == 0 {
 		return 0
 	}
-
 	// Group faces by their vertex key
 	type faceInfo struct {
 		index  int
 		normal math3d.Vec3
 	}
 	groups := make(map[[3]int][]faceInfo)
-
 	for i, f := range m.Faces {
 		// Calculate face normal
 		v0 := m.Vertices[f.V[0]].Position
@@ -270,18 +256,15 @@ func (m *Mesh) RemoveInternalFaces() int {
 		edge1 := v1.Sub(v0)
 		edge2 := v2.Sub(v0)
 		normal := edge1.Cross(edge2).Normalize()
-
 		key := faceKey(f.V[0], f.V[1], f.V[2])
 		groups[key] = append(groups[key], faceInfo{index: i, normal: normal})
 	}
-
 	// Mark faces for removal - pairs with opposing normals
 	toRemove := make(map[int]bool)
 	for _, faceList := range groups {
 		if len(faceList) < 2 {
 			continue
 		}
-
 		// Check all pairs for opposing normals
 		for i := range faceList {
 			if toRemove[faceList[i].index] {
@@ -303,11 +286,9 @@ func (m *Mesh) RemoveInternalFaces() int {
 			}
 		}
 	}
-
 	if len(toRemove) == 0 {
 		return 0
 	}
-
 	// Build new face list without removed faces
 	kept := make([]Face, 0, len(m.Faces)-len(toRemove))
 	for i, f := range m.Faces {
@@ -315,7 +296,6 @@ func (m *Mesh) RemoveInternalFaces() int {
 			kept = append(kept, f)
 		}
 	}
-
 	removed := len(m.Faces) - len(kept)
 	m.Faces = kept
 	return removed
@@ -329,20 +309,15 @@ func (m *Mesh) RemoveInternalFaces() int {
 // Returns the total number of faces removed.
 func (m *Mesh) CleanMesh() int {
 	removed := 0
-
 	// Remove degenerate faces first
 	removed += m.RemoveDegenerateFaces()
-
 	// Remove internal geometry (coplanar opposing faces) BEFORE dedup
 	// because DeduplicateFaces would remove one of the pair before we can detect it
 	removed += m.RemoveInternalFaces()
-
 	// Remove exact duplicates (same vertices, same direction)
 	removed += m.DeduplicateFaces()
-
 	// Clean up unreferenced vertices
 	m.RemoveUnreferencedVertices()
-
 	return removed
 }
 
@@ -352,16 +327,13 @@ func (m *Mesh) RemoveDegenerateFaces() int {
 	if len(m.Faces) == 0 {
 		return 0
 	}
-
 	const minArea = 1e-10
 	kept := make([]Face, 0, len(m.Faces))
-
 	for _, f := range m.Faces {
 		// Check for duplicate vertex indices
 		if f.V[0] == f.V[1] || f.V[1] == f.V[2] || f.V[0] == f.V[2] {
 			continue
 		}
-
 		// Check for near-zero area using cross product magnitude
 		v0 := m.Vertices[f.V[0]].Position
 		v1 := m.Vertices[f.V[1]].Position
@@ -370,12 +342,10 @@ func (m *Mesh) RemoveDegenerateFaces() int {
 		edge2 := v2.Sub(v0)
 		cross := edge1.Cross(edge2)
 		area := cross.Len() * 0.5
-
 		if area > minArea {
 			kept = append(kept, f)
 		}
 	}
-
 	removed := len(m.Faces) - len(kept)
 	m.Faces = kept
 	return removed
@@ -387,7 +357,6 @@ func (m *Mesh) RemoveUnreferencedVertices() {
 	if len(m.Faces) == 0 || len(m.Vertices) == 0 {
 		return
 	}
-
 	// Mark referenced vertices
 	referenced := make([]bool, len(m.Vertices))
 	for _, f := range m.Faces {
@@ -395,7 +364,6 @@ func (m *Mesh) RemoveUnreferencedVertices() {
 		referenced[f.V[1]] = true
 		referenced[f.V[2]] = true
 	}
-
 	// Build compacted vertex list and index mapping
 	newIndex := make([]int, len(m.Vertices))
 	newVertices := make([]MeshVertex, 0, len(m.Vertices))
@@ -405,13 +373,11 @@ func (m *Mesh) RemoveUnreferencedVertices() {
 			newVertices = append(newVertices, v)
 		}
 	}
-
 	// Update face indices
 	for i := range m.Faces {
 		m.Faces[i].V[0] = newIndex[m.Faces[i].V[0]]
 		m.Faces[i].V[1] = newIndex[m.Faces[i].V[1]]
 		m.Faces[i].V[2] = newIndex[m.Faces[i].V[2]]
 	}
-
 	m.Vertices = newVertices
 }

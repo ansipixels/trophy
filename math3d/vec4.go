@@ -31,15 +31,11 @@ func (v Vec4) PerspectiveDivide() Vec3 {
 }
 
 // Add returns the vector sum.
-//
-
 func (v Vec4) Add(b Vec4) Vec4 {
 	return Vec4{v.X + b.X, v.Y + b.Y, v.Z + b.Z, v.W + b.W}
 }
 
 // Sub returns the vector difference.
-//
-
 func (v Vec4) Sub(b Vec4) Vec4 {
 	return Vec4{v.X - b.X, v.Y - b.Y, v.Z - b.Z, v.W - b.W}
 }
@@ -50,8 +46,6 @@ func (v Vec4) Scale(s float64) Vec4 {
 }
 
 // Dot returns the dot product.
-//
-
 func (v Vec4) Dot(b Vec4) float64 {
 	return v.X*b.X + v.Y*b.Y + v.Z*b.Z + v.W*b.W
 }
@@ -71,8 +65,6 @@ func (v Vec4) Normalize() Vec4 {
 }
 
 // Lerp returns linear interpolation.
-//
-
 func (v Vec4) Lerp(b Vec4, t float64) Vec4 {
 	return Vec4{
 		v.X + (b.X-v.X)*t,

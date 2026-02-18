@@ -54,18 +54,14 @@ func LoadTexture(path string) (*Texture, error) {
 		return nil, fmt.Errorf("failed to open texture: %w", err)
 	}
 	defer f.Close()
-
 	img, _, err := image.Decode(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decode image: %w", err)
 	}
-
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-
 	tex := NewTexture(width, height)
-
 	for y := range height {
 		for x := range width {
 			c := img.At(bounds.Min.X+x, bounds.Min.Y+y)
@@ -80,7 +76,6 @@ func LoadTexture(path string) (*Texture, error) {
 			})
 		}
 	}
-
 	return tex, nil
 }
 
@@ -89,9 +84,7 @@ func TextureFromImage(img image.Image) *Texture {
 	bounds := img.Bounds()
 	width := bounds.Dx()
 	height := bounds.Dy()
-
 	tex := NewTexture(width, height)
-
 	for y := range height {
 		for x := range width {
 			c := img.At(bounds.Min.X+x, bounds.Min.Y+y)
@@ -106,7 +99,6 @@ func TextureFromImage(img image.Image) *Texture {
 			})
 		}
 	}
-
 	return tex
 }
 
@@ -160,10 +152,8 @@ func (t *Texture) Sample(u, v float64) Color {
 	// Apply wrap mode
 	u = t.wrapCoord(u, t.WrapU)
 	v = t.wrapCoord(v, t.WrapV)
-
 	// Flip V coordinate (image Y=0 at top, UV V=0 at bottom)
 	v = 1.0 - v
-
 	switch t.FilterMode {
 	case FilterBilinear:
 		return t.sampleBilinear(u, v)
@@ -187,7 +177,6 @@ func (t *Texture) wrapCoord(coord float64, mode WrapMode) float64 {
 func (t *Texture) sampleNearest(u, v float64) Color {
 	x := int(u * float64(t.Width))
 	y := int(v * float64(t.Height))
-
 	// Clamp to valid range
 	if x >= t.Width {
 		x = t.Width - 1
@@ -195,7 +184,6 @@ func (t *Texture) sampleNearest(u, v float64) Color {
 	if y >= t.Height {
 		y = t.Height - 1
 	}
-
 	return t.GetPixel(x, y)
 }
 
@@ -204,28 +192,23 @@ func (t *Texture) sampleBilinear(u, v float64) Color {
 	// Convert to pixel coordinates
 	fx := u*float64(t.Width) - 0.5
 	fy := v*float64(t.Height) - 0.5
-
 	x0 := int(math.Floor(fx))
 	y0 := int(math.Floor(fy))
 	x1 := x0 + 1
 	y1 := y0 + 1
-
 	// Fractional parts
 	tx := fx - float64(x0)
 	ty := fy - float64(y0)
-
 	// Wrap coordinates for sampling
 	x0 = t.wrapPixelCoord(x0, t.Width, t.WrapU)
 	x1 = t.wrapPixelCoord(x1, t.Width, t.WrapU)
 	y0 = t.wrapPixelCoord(y0, t.Height, t.WrapV)
 	y1 = t.wrapPixelCoord(y1, t.Height, t.WrapV)
-
 	// Sample 4 pixels
 	c00 := t.GetPixel(x0, y0)
 	c10 := t.GetPixel(x1, y0)
 	c01 := t.GetPixel(x0, y1)
 	c11 := t.GetPixel(x1, y1)
-
 	// Bilinear interpolation
 	top := lerpColor(c00, c10, tx)
 	bot := lerpColor(c01, c11, tx)
