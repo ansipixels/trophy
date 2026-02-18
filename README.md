@@ -40,6 +40,11 @@ docker run -ti ghcr.io/ansipixels/trophy # default Trophy model demo
 docker run -v `pwd`:/data -ti ghcr.io/ansipixels/trophy ./yourmodel.glb
 ```
 
+On windows with powershell, you probably need to set COLORTERM if not already to get the 24 bit images instead of mono:
+```powershell
+$env:COLORTERM = 'truecolor'
+```
+
 ## Usage
 
 ```bash
