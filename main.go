@@ -1,4 +1,4 @@
-// trophy - Terminal 3D Model Viewer
+// trophy - Terminal 3D Model Viewer -  ansipixels port + improvements.
 // View OBJ and GLB files in your terminal with full 3D rendering.
 //
 // Controls:
