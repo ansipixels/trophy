@@ -7,7 +7,7 @@
 
 # Trophy 🏆
 
-Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your terminal.
+Terminal 3D Model Viewer - View OBJ, GLB, and STL files directly in your terminal, ansipixels port + improvements.
 
 ![Trophy Demo](docs/demo.gif)
 
