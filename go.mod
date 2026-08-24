@@ -7,7 +7,7 @@ require (
 	fortio.org/log v1.18.3
 	fortio.org/terminal v0.65.3
 	github.com/charmbracelet/harmonica v0.2.0
-	github.com/qmuntal/gltf v0.28.0
+	github.com/qmuntal/gltf v0.29.0
 )
 
 require (
