@@ -1,4 +1,3 @@
-//nolint:gosec // gosec is bugged with [3]int somehow.
 package render
 
 import (
